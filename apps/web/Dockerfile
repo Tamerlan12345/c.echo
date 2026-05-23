@@ -14,6 +14,12 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app ./
 COPY . .
+
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_LIVEKIT_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_LIVEKIT_URL=$NEXT_PUBLIC_LIVEKIT_URL
+
 RUN pnpm --filter @centras/shared build && pnpm --filter web build
 
 # ─── Production image ─────────────────────────────────────────────────────────
