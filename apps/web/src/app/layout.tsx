@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: 'Centras.Echo — Корпоративные видеоконференции с ИИ',
   description: 'Защищённая платформа видеозвонков с умным ИИ-ассистентом Senti для автоматического протоколирования встреч',
   keywords: 'видеоконференции, корпоративные звонки, ИИ-протоколирование, Centras',
+  icons: {
+    icon: '/logo.svg',
+  },
   openGraph: {
     title: 'Centras.Echo',
     description: 'Корпоративные видеоконференции с ИИ-ассистентом Senti',

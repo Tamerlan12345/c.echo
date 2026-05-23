@@ -30,9 +30,10 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
 
     const result = await pool.query(
       `SELECT
-         m.id, m.title, m.livekit_room, m.created_at, m.ended_at,
-         m.duration_sec, m.is_recorded, m.senti_status,
-         m.summary,
+         m.id, m.title, m.creator_id AS "creatorId", m.livekit_room AS "livekitRoom",
+         m.created_at AS "createdAt", m.ended_at AS "endedAt",
+         m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
+         m.senti_status AS "sentiStatus", m.summary,
          json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
          (
            SELECT json_agg(json_build_object(
@@ -66,7 +67,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
     const result = await pool.query(
       `INSERT INTO meetings (title, creator_id, livekit_room)
        VALUES ($1, $2, $3)
-       RETURNING id, title, livekit_room, created_at, is_recorded, senti_status`,
+       RETURNING id, title, creator_id AS "creatorId", livekit_room AS "livekitRoom", created_at AS "createdAt", is_recorded AS "isRecorded", senti_status AS "sentiStatus"`,
       [body.data.title, user.sub, roomName],
     )
 
@@ -93,8 +94,10 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
 
     const result = await pool.query(
       `SELECT
-         m.id, m.title, m.livekit_room, m.created_at, m.ended_at,
-         m.duration_sec, m.is_recorded, m.senti_status, m.summary,
+         m.id, m.title, m.creator_id AS "creatorId", m.livekit_room AS "livekitRoom",
+         m.created_at AS "createdAt", m.ended_at AS "endedAt",
+         m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
+         m.senti_status AS "sentiStatus", m.summary,
          json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
          (
            SELECT json_agg(json_build_object(
@@ -174,7 +177,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const result = await pool.query(
-      `SELECT id, speaker_name, phrase, start_sec, end_sec
+      `SELECT id, speaker_name AS "speakerName", phrase, start_sec AS "startSec", end_sec AS "endSec"
        FROM meeting_transcripts
        WHERE meeting_id = $1
        ORDER BY start_sec ASC`,
@@ -200,7 +203,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const result = await pool.query(
-      `SELECT id, speaker_name, phrase, start_sec,
+      `SELECT id, speaker_name AS "speakerName", phrase, start_sec AS "startSec",
               ts_rank(phrase_tsv, query) AS rank
        FROM meeting_transcripts, plainto_tsquery('russian', $2) query
        WHERE meeting_id = $1 AND phrase_tsv @@ query

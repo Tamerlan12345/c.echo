@@ -71,6 +71,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
           name: user.name,
           role: user.role,
           avatarUrl: (user as any).avatar_url,
+          createdAt: (user as any).created_at,
         },
       },
     })
@@ -154,7 +155,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     }
     const u = result.rows[0]
     return reply.send({
-      data: { id: u.id, email: u.email, name: u.name, role: u.role, avatarUrl: u.avatar_url },
+      data: { id: u.id, email: u.email, name: u.name, role: u.role, avatarUrl: u.avatar_url, createdAt: u.created_at },
     })
   })
 }

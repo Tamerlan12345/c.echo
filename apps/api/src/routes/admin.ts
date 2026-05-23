@@ -35,7 +35,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/admin/users — list all users
   app.get('/users', async (_request, reply) => {
     const result = await pool.query(
-      `SELECT id, email, name, role, avatar_url, created_at
+      `SELECT id, email, name, role, avatar_url AS "avatarUrl", created_at AS "createdAt"
        FROM users
        ORDER BY created_at DESC`,
     )
@@ -63,7 +63,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const result = await pool.query(
       `INSERT INTO users (email, name, role, password_hash)
        VALUES ($1, $2, $3, 'GOOGLE_SSO_ONLY')
-       RETURNING id, email, name, role, created_at`,
+       RETURNING id, email, name, role, avatar_url AS "avatarUrl", created_at AS "createdAt"`,
       [email.toLowerCase(), name, role],
     )
 
