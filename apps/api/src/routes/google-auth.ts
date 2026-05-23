@@ -59,7 +59,8 @@ export const googleAuthRoutes: FastifyPluginAsync = async (app) => {
         }),
       })
       googleTokens = await tokenRes.json() as { access_token: string }
-    } catch {
+    } catch (err) {
+      app.log.error(err, 'Google OAuth token exchange failed')
       return reply.redirect(`${process.env.FRONTEND_URL}/login?error=google_token_failed`)
     }
 
@@ -70,7 +71,8 @@ export const googleAuthRoutes: FastifyPluginAsync = async (app) => {
         headers: { Authorization: `Bearer ${googleTokens.access_token}` },
       })
       googleUser = await userRes.json() as GoogleUserInfo
-    } catch {
+    } catch (err) {
+      app.log.error(err, 'Google OAuth profile fetch failed')
       return reply.redirect(`${process.env.FRONTEND_URL}/login?error=google_profile_failed`)
     }
 
