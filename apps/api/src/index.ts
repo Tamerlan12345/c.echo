@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import Fastify from 'fastify'
+import Fastify, { FastifyRequest, FastifyReply } from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
@@ -33,6 +33,14 @@ await app.register(cors, {
 await app.register(jwt, {
   secret: process.env.JWT_SECRET ?? 'dev-secret-change-in-production',
   sign: { expiresIn: '15m' },
+})
+
+app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    await request.jwtVerify()
+  } catch (err) {
+    reply.send(err)
+  }
 })
 
 await app.register(rateLimit, {
