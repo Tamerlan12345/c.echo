@@ -25,6 +25,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Copy dependencies and config files
 COPY --from=deps    /app                      ./
 COPY --from=builder /app/apps/web             ./apps/web
+COPY --from=builder /app/apps/web/public      ./public
 COPY --from=builder /app/packages/shared/dist  ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 
