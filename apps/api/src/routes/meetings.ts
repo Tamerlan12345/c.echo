@@ -36,7 +36,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
          json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
          (
            SELECT json_agg(json_build_object(
-             'userId', p.id, 'name', p.name, 'avatarUrl', p.avatar_url, 'joinedAt', mp.joined_at
+             'userId', p.id, 'name', p.name, 'avatarUrl', p.avatar_url, 'joinedAt', mp2.joined_at
            ))
            FROM meeting_participants mp2
            JOIN users p ON p.id = mp2.user_id
