@@ -40,7 +40,7 @@ async function apiFetch<T>(
   const token = getAccessToken()
 
   const headers: Record<string, string> = {}
-  if (!(options.body instanceof FormData)) {
+  if (options.body !== undefined && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json'
   }
   Object.assign(headers, options.headers)
