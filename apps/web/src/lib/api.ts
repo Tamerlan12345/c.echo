@@ -17,11 +17,17 @@ function getRefreshToken(): string | null {
 function setTokens(access: string, refresh: string): void {
   sessionStorage.setItem('centras_access', access)
   localStorage.setItem('centras_refresh', refresh)
+  if (typeof window !== 'undefined') {
+    document.cookie = `centras_access=${access}; path=/; max-age=900; SameSite=Lax; Secure`
+  }
 }
 
 function clearTokens(): void {
   sessionStorage.removeItem('centras_access')
   localStorage.removeItem('centras_refresh')
+  if (typeof window !== 'undefined') {
+    document.cookie = 'centras_access=; path=/; max-age=0; SameSite=Lax; Secure'
+  }
 }
 
 // ─── Core fetch with auto-refresh ────────────────────────────────────────────

@@ -25,9 +25,9 @@ export default function AuthCallbackPage() {
     }
 
     // Store tokens in sessionStorage (access) and localStorage (refresh)
-    // In production consider httpOnly cookies via a /api/set-cookie endpoint
     sessionStorage.setItem('centras_access', accessToken)
     localStorage.setItem('centras_refresh', refreshToken)
+    document.cookie = `centras_access=${accessToken}; path=/; max-age=900; SameSite=Lax; Secure`
 
     // Clear the fragment from URL immediately (security)
     window.history.replaceState(null, '', '/auth/callback')
