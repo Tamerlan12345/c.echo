@@ -4,7 +4,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # ─── Install dependencies ─────────────────────────────────────────────────────
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml turbo.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 RUN pnpm install --frozen-lockfile
