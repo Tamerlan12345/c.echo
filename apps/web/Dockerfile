@@ -22,15 +22,15 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy dependencies
+# Copy dependencies and config files
 COPY --from=deps    /app                      ./
-COPY --from=builder /app/apps/web/.next       ./apps/web/.next
-COPY --from=builder /app/apps/web/public      ./apps/web/public
+COPY --from=builder /app/apps/web             ./apps/web
 COPY --from=builder /app/packages/shared/dist  ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 EXPOSE 3000
 
