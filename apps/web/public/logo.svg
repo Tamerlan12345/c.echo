@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200" height="48" fill="none">
+  <defs>
+    <linearGradient id="centrasGrad" x1="0" y1="0" x2="200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E50012"/>
+      <stop offset="50%" stop-color="#8A005A"/>
+      <stop offset="100%" stop-color="#0033A0"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(10, 8)">
+    <rect x="2" y="8" width="16" height="16" rx="4" fill="url(#centrasGrad)"/>
+    <path d="M18 12L24 8V24L18 20V12Z" fill="url(#centrasGrad)"/>
+    <path d="M27 10C29 12.5 29 19.5 27 22" stroke="url(#centrasGrad)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M31 7C34 10.5 34 21.5 31 25" stroke="url(#centrasGrad)" stroke-width="2.5" stroke-opacity="0.7" stroke-linecap="round"/>
+  </g>
+
+  <text x="52" y="32" font-family="'Outfit', 'Inter', sans-serif" font-size="22" font-weight="800" fill="url(#centrasGrad)" letter-spacing="-0.03em">centras</text>
+  <text x="138" y="32" font-family="'Outfit', 'Inter', sans-serif" font-size="22" font-weight="300" fill="#E8F0FE" letter-spacing="-0.02em">echo</text>
+</svg>

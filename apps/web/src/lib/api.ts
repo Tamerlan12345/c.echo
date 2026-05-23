@@ -1,0 +1,202 @@
+import type { ApiResult, Meeting, User, ConsentStatus, SentiChatResponse, LiveKitTokenResponse } from '@centras/shared'
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+
+// ─── Token management ─────────────────────────────────────────────────────────
+
+function getAccessToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return sessionStorage.getItem('centras_access')
+}
+
+function getRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('centras_refresh')
+}
+
+function setTokens(access: string, refresh: string): void {
+  sessionStorage.setItem('centras_access', access)
+  localStorage.setItem('centras_refresh', refresh)
+}
+
+function clearTokens(): void {
+  sessionStorage.removeItem('centras_access')
+  localStorage.removeItem('centras_refresh')
+}
+
+// ─── Core fetch with auto-refresh ────────────────────────────────────────────
+
+async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+  retry = true,
+): Promise<ApiResult<T>> {
+  const token = getAccessToken()
+
+  const headers: Record<string, string> = {}
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json'
+  }
+  Object.assign(headers, options.headers)
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+
+  // Auto-refresh on 401
+  if (res.status === 401 && retry) {
+    const refreshed = await tryRefresh()
+    if (refreshed) {
+      return apiFetch<T>(path, options, false)
+    }
+    // Refresh failed — redirect to login
+    clearTokens()
+    window.location.href = '/login'
+    return { error: { code: 'UNAUTHORIZED', message: 'Session expired' } }
+  }
+
+  const data = await res.json()
+  return data as ApiResult<T>
+}
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) return false
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+
+    if (!res.ok) return false
+
+    const data = await res.json()
+    if (data.data?.accessToken) {
+      setTokens(data.data.accessToken, data.data.refreshToken)
+      return true
+    }
+  } catch {
+    return false
+  }
+
+  return false
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export const authApi = {
+  me: () => apiFetch<User>('/api/auth/me'),
+  logout: async () => {
+    await apiFetch('/api/auth/logout', { method: 'POST' })
+    clearTokens()
+    window.location.href = '/login'
+  },
+  googleLoginUrl: () => `${BASE_URL}/api/auth/google`,
+}
+
+// ─── Meetings ─────────────────────────────────────────────────────────────────
+
+export const meetingsApi = {
+  list: () => apiFetch<Meeting[]>('/api/meetings'),
+
+  get: (id: string) => apiFetch<Meeting>(`/api/meetings/${id}`),
+
+  create: (title: string) =>
+    apiFetch<Meeting>('/api/meetings', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }),
+
+  end: (id: string) =>
+    apiFetch<{ ended: boolean }>(`/api/meetings/${id}/end`, { method: 'POST' }),
+
+  join: (id: string) =>
+    apiFetch<{ joined: boolean }>(`/api/meetings/${id}/join`, { method: 'POST' }),
+
+  getTranscript: (id: string) =>
+    apiFetch<Array<{ id: string; speakerName: string; phrase: string; startSec: number }>>(`/api/meetings/${id}/transcript`),
+
+  search: (id: string, q: string) =>
+    apiFetch<Array<{ id: string; speakerName: string; phrase: string; startSec: number }>>(`/api/meetings/${id}/search?q=${encodeURIComponent(q)}`),
+
+  uploadAudio: (id: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiFetch<{ success: boolean; sentiStatus: string }>(`/api/meetings/${id}/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+  },
+}
+
+// ─── Consent ──────────────────────────────────────────────────────────────────
+
+export const consentApi = {
+  give: (meetingId: string) =>
+    apiFetch<ConsentStatus>(`/api/meetings/${meetingId}/consent`, { method: 'POST' }),
+
+  revoke: (meetingId: string) =>
+    apiFetch<ConsentStatus>(`/api/meetings/${meetingId}/consent`, { method: 'DELETE' }),
+
+  status: (meetingId: string) =>
+    apiFetch<ConsentStatus>(`/api/meetings/${meetingId}/consent/status`),
+}
+
+// ─── LiveKit ──────────────────────────────────────────────────────────────────
+
+export const livekitApi = {
+  token: (meetingId: string) =>
+    apiFetch<LiveKitTokenResponse>('/api/livekit/token', {
+      method: 'POST',
+      body: JSON.stringify({ meetingId }),
+    }),
+
+  startRecording: (meetingId: string) =>
+    apiFetch<{ recording: boolean }>('/api/livekit/egress/start', {
+      method: 'POST',
+      body: JSON.stringify({ meetingId }),
+    }),
+
+  stopRecording: (meetingId: string) =>
+    apiFetch<{ stopped: boolean; sentiStatus: string }>('/api/livekit/egress/stop', {
+      method: 'POST',
+      body: JSON.stringify({ meetingId }),
+    }),
+}
+
+// ─── Senti ────────────────────────────────────────────────────────────────────
+
+export const sentiApi = {
+  chat: (meetingId: string, question: string) =>
+    apiFetch<SentiChatResponse>('/api/senti/chat', {
+      method: 'POST',
+      body: JSON.stringify({ meetingId, question }),
+    }),
+}
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+export const adminApi = {
+  listUsers: () => apiFetch<User[]>('/api/admin/users'),
+
+  createUser: (data: { email: string; name: string; role: 'admin' | 'moderator' | 'employee' }) =>
+    apiFetch<User>('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateUser: (id: string, data: { name?: string; role?: string }) =>
+    apiFetch<User>(`/api/admin/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteUser: (id: string) =>
+    apiFetch<{ deleted: boolean }>(`/api/admin/users/${id}`, { method: 'DELETE' }),
+
+  stats: () => apiFetch<{ totalUsers: number; totalMeetings: number; activeMeetings: number }>('/api/admin/stats'),
+}

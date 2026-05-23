@@ -1,0 +1,32 @@
+# LiveKit Self-Hosted configuration for Railway
+# Mount this file at /etc/livekit.yaml in the container
+
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+
+# Keys: format is API_KEY: API_SECRET
+keys:
+  centras_api_key: ${LIVEKIT_API_SECRET}
+
+# Egress — write audio files to Railway Volume
+egress:
+  redis:
+    address: localhost:6379
+
+# Logging
+logging:
+  level: info
+  pion_level: error
+
+# Room limits
+room:
+  max_participants: 7
+  empty_timeout: 300  # 5 minutes
+
+# Turn server (optional — Railway can expose TCP/UDP)
+turn:
+  enabled: false
