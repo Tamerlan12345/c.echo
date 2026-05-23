@@ -16,6 +16,35 @@ const getEgressClient = () => new EgressClient(
   process.env.LIVEKIT_API_SECRET!,
 )
 
+const getPublicLiveKitUrl = (): string => {
+  if (process.env.PUBLIC_LIVEKIT_URL) {
+    return process.env.PUBLIC_LIVEKIT_URL
+  }
+
+  const livekitUrl = process.env.LIVEKIT_URL || ''
+  if (
+    livekitUrl &&
+    !livekitUrl.includes('localhost') &&
+    !livekitUrl.includes('127.0.0.1') &&
+    !livekitUrl.includes('.internal') &&
+    (livekitUrl.startsWith('wss://') || livekitUrl.startsWith('ws://'))
+  ) {
+    return livekitUrl
+  }
+
+  const frontendUrl = process.env.FRONTEND_URL || ''
+  if (frontendUrl && !frontendUrl.includes('localhost') && !frontendUrl.includes('127.0.0.1')) {
+    try {
+      const url = new URL(frontendUrl)
+      return `wss://livekit.${url.hostname}`
+    } catch {
+      // ignore
+    }
+  }
+
+  return livekitUrl || 'ws://localhost:7880'
+}
+
 export const livekitRoutes: FastifyPluginAsync = async (app) => {
 
   app.addHook('onRequest', app.authenticate)
@@ -88,7 +117,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     return reply.send({
       data: {
         token,
-        serverUrl: process.env.LIVEKIT_URL!,
+        serverUrl: getPublicLiveKitUrl(),
       },
     })
   })
