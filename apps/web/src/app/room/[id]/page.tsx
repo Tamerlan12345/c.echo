@@ -244,7 +244,8 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
   // End call
   const handleEndCall = async () => {
-    if (isHost) {
+    const isLastParticipant = allParticipants.length <= 1
+    if (isHost || isLastParticipant) {
       if (isRecording) await livekitApi.stopRecording(meetingId)
       await meetingsApi.end(meetingId)
     }
@@ -598,40 +599,44 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
       )}
 
       {/* ── End Call Confirm ── */}
-      {showEndConfirm && (
-        <div className="modal-overlay" onClick={() => setShowEndConfirm(false)}>
-          <div
-            className={`modal-content ${styles.endCallModal}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.endCallIcon}>
-              <PhoneOff size={24} />
-            </div>
-            <h3 style={{ marginBottom: 'var(--space-2)' }}>
-              {isHost ? 'Завершить встречу?' : 'Покинуть встречу?'}
-            </h3>
-            <p style={{ marginBottom: 'var(--space-6)', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-              {isHost
-                ? 'Встреча завершится для всех участников. Если была запущена запись — Senti создаст протокол.'
-                : 'Вы покинете комнату. Встреча продолжится для остальных участников.'
-              }
-            </p>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
-              <button className="btn btn-ghost" onClick={() => setShowEndConfirm(false)}>
-                Отмена
-              </button>
-              <button
-                id="confirm-end-call-btn"
-                className="btn btn-danger"
-                onClick={handleEndCall}
-              >
-                {isHost ? <PhoneOff size={16} /> : <LogOut size={16} />}
-                {isHost ? 'Завершить для всех' : 'Покинуть'}
-              </button>
+      {showEndConfirm && (() => {
+        const isLastParticipant = allParticipants.length <= 1
+        const willEndCall = isHost || isLastParticipant
+        return (
+          <div className="modal-overlay" onClick={() => setShowEndConfirm(false)}>
+            <div
+              className={`modal-content ${styles.endCallModal}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.endCallIcon}>
+                <PhoneOff size={24} />
+              </div>
+              <h3 style={{ marginBottom: 'var(--space-2)' }}>
+                {willEndCall ? 'Завершить встречу?' : 'Покинуть встречу?'}
+              </h3>
+              <p style={{ marginBottom: 'var(--space-6)', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                {willEndCall
+                  ? 'Встреча завершится и будет отмечена как выполненная. Senti сохранит протокол при наличии записи.'
+                  : 'Вы покинете комнату. Встреча продолжится для остальных участников.'
+                }
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+                <button className="btn btn-ghost" onClick={() => setShowEndConfirm(false)}>
+                  Отмена
+                </button>
+                <button
+                  id="confirm-end-call-btn"
+                  className="btn btn-danger"
+                  onClick={handleEndCall}
+                >
+                  {willEndCall ? <PhoneOff size={16} /> : <LogOut size={16} />}
+                  {willEndCall ? 'Завершить для всех' : 'Покинуть'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

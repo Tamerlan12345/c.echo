@@ -138,10 +138,15 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
     return reply.send({ data: { joined: true } })
   })
 
-  // POST /api/meetings/:id/end — host ends the meeting
+  // POST /api/meetings/:id/end — host or participant ends the meeting
   app.post('/:id/end', async (request, reply) => {
     const user = request.user as { sub: string }
     const { id } = request.params as { id: string }
+
+    const allowed = await assertParticipant(id, user.sub)
+    if (!allowed) {
+      return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Access denied' } })
+    }
 
     const meeting = await pool.query(
       'SELECT creator_id, created_at FROM meetings WHERE id = $1 AND ended_at IS NULL',
@@ -150,10 +155,6 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
 
     if (!meeting.rows[0]) {
       return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Active meeting not found' } })
-    }
-
-    if (meeting.rows[0].creator_id !== user.sub) {
-      return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only host can end the meeting' } })
     }
 
     const durationSec = Math.floor((Date.now() - new Date(meeting.rows[0].created_at).getTime()) / 1000)

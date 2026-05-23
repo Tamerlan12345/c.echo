@@ -3,12 +3,12 @@
 /* ─── Design Tokens ─────────────────────────────────────────────────────────── */
 :root {
   /* Colors */
-  --color-bg-primary:    #0D1B2A;
-  --color-bg-surface:    #112240;
-  --color-bg-surface-2:  #1A3056;
-  --color-bg-glass:      rgba(17, 34, 64, 0.72);
-  --color-border:        rgba(0, 212, 255, 0.12);
-  --color-border-hover:  rgba(0, 212, 255, 0.28);
+  --color-bg-primary:    #0A0F1D; /* Deep luxurious dark slate-blue */
+  --color-bg-surface:    #151E33; /* Contrast luminous slate-blue card background */
+  --color-bg-surface-2:  #202C4E; /* Lighter slate for form inputs and active highlights */
+  --color-bg-glass:      rgba(21, 30, 51, 0.75);
+  --color-border:        rgba(99, 102, 241, 0.18); /* Elegant semi-transparent Indigo border */
+  --color-border-hover:  rgba(99, 102, 241, 0.35);
 
   /* Accent */
   --color-accent-blue:   #8A005A; /* Corporate purple */
@@ -60,7 +60,7 @@
   --shadow-sm:  0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
   --shadow-md:  0 4px 16px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
   --shadow-lg:  0 8px 32px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-glow-blue:  0 0 20px rgba(0, 212, 255, 0.25);
+  --shadow-glow-blue:  0 0 20px rgba(99, 102, 241, 0.3);
   --shadow-glow-amber: 0 0 20px rgba(255, 183, 3, 0.25);
 
   /* Blur */
@@ -115,7 +115,7 @@ code, pre {
   background: var(--color-bg-surface-2);
   border-radius: var(--radius-full);
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.3); }
+::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.45); }
 
 /* ─── Utility Classes ────────────────────────────────────────────────────────── */
 
@@ -237,7 +237,7 @@ code, pre {
 .input-field::placeholder { color: var(--color-text-disabled); }
 .input-field:focus {
   border-color: var(--color-accent-blue);
-  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 .input-field:disabled { opacity: 0.5; cursor: not-allowed; }
 

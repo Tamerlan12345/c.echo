@@ -8,6 +8,10 @@ rtc:
   port_range_end: 60000
   use_external_ip: true
 
+# CORS — allow frontend origin to validate tokens via HTTP before WebSocket upgrade
+allowed_origins:
+  - "https://centras-echo.up.railway.app"
+
 # Keys: format is API_KEY: API_SECRET
 keys:
   centras_api_key: ${LIVEKIT_API_SECRET}
