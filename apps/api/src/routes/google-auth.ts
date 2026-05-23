@@ -88,8 +88,21 @@ export const googleAuthRoutes: FastifyPluginAsync = async (app) => {
     let user = existing.rows[0]
 
     if (!user) {
-      // User not found — they must be invited by admin first
-      return reply.redirect(`${process.env.FRONTEND_URL}/login?error=not_invited`)
+      // Check if DB has any users. If 0, bootstrap the first user as admin
+      const countRes = await pool.query('SELECT COUNT(*) FROM users')
+      const totalUsers = Number(countRes.rows[0].count)
+      if (totalUsers === 0) {
+        const insertRes = await pool.query(
+          `INSERT INTO users (email, name, role, google_id, avatar_url)
+           VALUES ($1, $2, 'admin', $3, $4)
+           RETURNING id, email, name, role, avatar_url, google_id`,
+          [googleUser.email.toLowerCase(), googleUser.name, googleUser.sub, googleUser.picture ?? null]
+        )
+        user = insertRes.rows[0]
+      } else {
+        // User not found — they must be invited by admin first
+        return reply.redirect(`${process.env.FRONTEND_URL}/login?error=not_invited`)
+      }
     }
 
     // Link Google account on first SSO login (store google_id)
