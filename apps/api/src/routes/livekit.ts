@@ -176,7 +176,6 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     // Start LiveKit Egress — composite audio file to Railway Volume
     const client = getEgressClient()
     const outputPath = `/data/audio/${meetingId}.mp3`
-    let egressId = ''
 
     try {
       const egress = await client.startRoomCompositeEgress(meeting.rows[0].livekit_room, {
@@ -185,30 +184,25 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
           fileType: 4, // MP3
         } as any,
       })
-      egressId = egress.egressId
+
+      // Store egress ID for later stop
+      await pool.query(
+        `UPDATE meetings
+         SET is_recorded = TRUE, egress_id = $1
+         WHERE id = $2`,
+        [egress.egressId, meetingId],
+      )
+
+      return reply.send({ data: { recording: true, egressId: egress.egressId } })
     } catch (err: any) {
-      app.log.warn({ err, meetingId }, 'LiveKit egress start failed, using simulated recording')
-      egressId = `simulated-${meetingId}`
-
-      // Create directories and write a valid silent MP3 file
-      try {
-        fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-        const silenceBase64 = 'SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQDkAAAAAAAAAGw9wrNaQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+MYxAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxHYAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV'
-        fs.writeFileSync(outputPath, Buffer.from(silenceBase64, 'base64'))
-      } catch (fsErr) {
-        app.log.error({ fsErr, meetingId }, 'Failed to create simulated silent MP3 file')
-      }
+      app.log.error({ err, meetingId }, 'Failed to start LiveKit egress')
+      return reply.status(500).send({
+        error: {
+          code: 'EGRESS_START_FAILED',
+          message: err.message || 'Не удалось запустить службу записи LiveKit. Проверьте подключение Redis на сервере LiveKit.',
+        },
+      })
     }
-
-    // Store egress ID for later stop
-    await pool.query(
-      `UPDATE meetings
-       SET is_recorded = TRUE, egress_id = $1
-       WHERE id = $2`,
-      [egressId, meetingId],
-    )
-
-    return reply.send({ data: { recording: true, egressId } })
   })
 
   // POST /api/livekit/egress/stop — stop recording + trigger Senti pipeline
@@ -228,15 +222,21 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const egressId = meeting.rows[0].egress_id
-    if (egressId && !egressId.startsWith('simulated-')) {
-      try {
-        const client = getEgressClient()
-        await client.stopEgress(egressId)
-      } catch (err) {
-        app.log.error({ err, egressId }, 'Failed to stop LiveKit egress')
-      }
-    } else {
-      app.log.info({ meetingId }, 'Stopping simulated recording (no LiveKit egress stop needed)')
+    if (!egressId) {
+      return reply.status(400).send({ error: { code: 'NO_RECORDING', message: 'No active recording found' } })
+    }
+
+    try {
+      const client = getEgressClient()
+      await client.stopEgress(egressId)
+    } catch (err: any) {
+      app.log.error({ err, egressId }, 'Failed to stop LiveKit egress')
+      return reply.status(500).send({
+        error: {
+          code: 'EGRESS_STOP_FAILED',
+          message: err.message || 'Failed to stop LiveKit egress',
+        },
+      })
     }
 
     // Mark as processing — Senti pipeline starts async
