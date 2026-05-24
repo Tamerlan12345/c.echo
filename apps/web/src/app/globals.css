@@ -325,6 +325,11 @@ code, pre {
 .fade-up-delay-2 { animation-delay: 0.2s; }
 .fade-up-delay-3 { animation-delay: 0.3s; }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
 /* ─── Divider ────────────────────────────────────────────────────────────────── */
 .divider {
   height: 1px;

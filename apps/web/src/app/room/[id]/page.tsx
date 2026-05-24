@@ -15,7 +15,7 @@ import { Track, RoomEvent } from 'livekit-client'
 import {
   Mic, MicOff, Video, VideoOff, Monitor, Users,
   PhoneOff, Bot, Shield, CheckCircle2, XCircle,
-  Circle, StopCircle, X, LogOut,
+  Circle, StopCircle, X, LogOut, MessageSquare, Send,
 } from 'lucide-react'
 import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
@@ -99,6 +99,14 @@ interface RoomInnerProps {
   router: ReturnType<typeof useRouter>
 }
 
+interface ChatMessage {
+  id: string
+  userId: string
+  userName: string
+  text: string
+  timestamp: number
+}
+
 function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   const room = useRoomContext()
   const remoteParticipants = useParticipants()
@@ -109,9 +117,26 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
   // UI state
   const [showSenti, setShowSenti] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const [showParticipants, setShowParticipants] = useState(true)
   const [showConsentModal, setShowConsentModal] = useState(false)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const chatBottomRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Clear unread when opening chat
+  useEffect(() => {
+    if (showChat) setUnreadCount(0)
+  }, [showChat])
 
   // Media state (derived from LiveKit)
   const [micEnabled, setMicEnabled] = useState(true)
@@ -145,7 +170,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
   // Listen to LiveKit DataChannel
   useEffect(() => {
-    const handleDataReceived = (payload: Uint8Array) => {
+    const handleDataReceived = (payload: Uint8Array, participant: any) => {
       try {
         const decoder = new TextDecoder()
         const data = JSON.parse(decoder.decode(payload))
@@ -155,6 +180,16 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
           if (!isHost) {
             setShowConsentModal(true)
           }
+        } else if (data.type === 'chat') {
+          const newMsg: ChatMessage = {
+            id: Math.random().toString(36).substr(2, 9),
+            userId: participant?.identity || 'unknown',
+            userName: participant?.name || 'Гость',
+            text: data.text,
+            timestamp: Date.now(),
+          }
+          setMessages((prev) => [...prev, newMsg])
+          if (!showChat) setUnreadCount((c) => c + 1)
         }
       } catch (err) {
         console.error('Failed to parse data channel message:', err)
@@ -165,7 +200,26 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     return () => {
       room.off(RoomEvent.DataReceived, handleDataReceived)
     }
-  }, [room, isHost, pollConsent])
+  }, [room, isHost, pollConsent, showChat])
+
+  // Send message
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!chatInput.trim() || !localParticipant) return
+    const msg = { type: 'chat', text: chatInput }
+    const encoder = new TextEncoder()
+    const data = encoder.encode(JSON.stringify(msg))
+    await localParticipant.publishData(data, { reliable: true })
+    
+    setMessages((prev) => [...prev, {
+      id: Math.random().toString(36).substr(2, 9),
+      userId: localParticipant.identity,
+      userName: localParticipant.name || 'Вы',
+      text: chatInput,
+      timestamp: Date.now(),
+    }])
+    setChatInput('')
+  }
 
   // Toggle microphone
   const toggleMic = useCallback(async () => {
@@ -399,8 +453,26 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
             </button>
           </div>
 
-          {/* Right: Senti */}
+          {/* Right: Senti + Chat */}
           <div className={styles.controlsRight}>
+            <Tooltip label={showChat ? 'Закрыть чат' : 'Открыть чат'}>
+              <div className={styles.controlBtnBadge}>
+                <button
+                  id="toggle-chat-btn"
+                  className={`${styles.controlBtn} ${showChat ? styles.active : ''}`}
+                  onClick={() => {
+                    setShowChat((v) => !v)
+                    if (showSenti) setShowSenti(false)
+                  }}
+                  aria-label="Чат встречи"
+                >
+                  <MessageSquare size={20} />
+                </button>
+                {unreadCount > 0 && !showChat && (
+                  <span className={styles.unreadBadge}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+                )}
+              </div>
+            </Tooltip>
             {isHost && (
               <Tooltip label={showSenti ? 'Закрыть Senti' : 'Открыть Senti-протокол'}>
                 <button
@@ -416,6 +488,87 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
           </div>
         </div>
       </div>
+
+      {/* ── Chat Panel ── */}
+      {showChat && (
+        <aside className={styles.chatPanel}>
+          <div className={styles.chatHeader}>
+            <div className={styles.chatTitle}>
+              <MessageSquare size={18} color="var(--color-accent-blue)" />
+              Чат встречи
+            </div>
+            <button
+              className={styles.controlBtn}
+              style={{ width: 32, height: 32 }}
+              onClick={() => setShowChat(false)}
+              aria-label="Закрыть чат"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className={styles.chatMessages}>
+            {messages.length === 0 ? (
+              <div className={styles.chatEmpty}>
+                <div className={styles.chatEmptyIcon}>
+                  <MessageSquare size={24} />
+                </div>
+                <p className={styles.chatEmptyText}>
+                  Сообщений пока нет.<br />Напишите первым!
+                </p>
+              </div>
+            ) : (
+              messages.map((m) => {
+                const isMine = m.userId === localParticipant?.identity
+                return (
+                  <div
+                    key={m.id}
+                    className={`${styles.chatMessage} ${isMine ? styles.chatMessageMine : styles.chatMessageOther}`}
+                  >
+                    {!isMine && (
+                      <span className={styles.chatMessageSender}>{m.userName}</span>
+                    )}
+                    <div className={`${styles.chatBubble} ${isMine ? styles.chatBubbleMine : styles.chatBubbleOther}`}>
+                      {m.text}
+                    </div>
+                    <span className={styles.chatMessageTime}>
+                      {new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(m.timestamp))}
+                    </span>
+                  </div>
+                )
+              })
+            )}
+            <div ref={chatBottomRef} />
+          </div>
+
+          <div className={styles.chatInputArea}>
+            <textarea
+              id="chat-input"
+              className={styles.chatInput}
+              placeholder="Написать сообщение…"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendMessage(e as unknown as React.FormEvent)
+                }
+              }}
+              rows={1}
+              aria-label="Сообщение в чат"
+            />
+            <button
+              id="chat-send-btn"
+              className={styles.chatSendBtn}
+              onClick={(e) => sendMessage(e as unknown as React.FormEvent)}
+              disabled={!chatInput.trim()}
+              aria-label="Отправить сообщение"
+            >
+              <Send size={18} />
+            </button>
+          </div>
+        </aside>
+      )}
 
       {/* ── Senti Panel ── */}
       {showSenti && (
