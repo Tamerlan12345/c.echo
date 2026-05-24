@@ -35,6 +35,7 @@ export interface Meeting {
   participants?: MeetingParticipant[]
   scheduledStart?: string | null
   isPublic?: boolean
+  waitingRoomEnabled?: boolean
 }
 
 export interface MeetingParticipant {

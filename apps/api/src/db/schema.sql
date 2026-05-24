@@ -153,3 +153,24 @@ CREATE POLICY consents_access ON meeting_consents
               AND mp.user_id = NULLIF(current_setting('app.current_user_id', true), '')::UUID
         )
     );
+
+-- ─── Waiting Room ─────────────────────────────────────────────────────────────
+
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS waiting_room_enabled BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS meeting_waiting_room (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    meeting_id    UUID REFERENCES meetings(id) ON DELETE CASCADE,
+    user_id       UUID REFERENCES users(id) ON DELETE CASCADE,
+    status        TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'admitted', 'rejected')),
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (meeting_id, user_id)
+);
+
+ALTER TABLE meeting_waiting_room ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS waiting_room_access ON meeting_waiting_room;
+CREATE POLICY waiting_room_access ON meeting_waiting_room
+    FOR ALL
+    USING (true);
+

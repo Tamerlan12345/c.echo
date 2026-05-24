@@ -8,7 +8,7 @@ import styles from './dashboard.module.css'
 import {
   Video, Plus, Archive, Settings, LogOut, Users,
   Clock, Shield, ChevronRight, Zap,
-  Calendar, Copy, Check, Info, CalendarClock, Globe
+  Calendar, Copy, Check, CalendarClock, Globe
 } from 'lucide-react'
 
 const MAX_ACTIVE = 5
@@ -27,6 +27,7 @@ export default function DashboardPage() {
   const [isScheduled, setIsScheduled] = useState(false)
   const [scheduleTime, setScheduleTime] = useState('')
   const [isPublic, setIsPublic] = useState(false)
+  const [waitingRoomEnabled, setWaitingRoomEnabled] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
@@ -69,6 +70,7 @@ export default function DashboardPage() {
       newTitle.trim(),
       utcScheduledStart,
       isPublic,
+      waitingRoomEnabled,
     )
     if ('data' in res && res.data) {
       setShowCreate(false)
@@ -76,6 +78,7 @@ export default function DashboardPage() {
       setIsScheduled(false)
       setScheduleTime('')
       setIsPublic(false)
+      setWaitingRoomEnabled(false)
       if (!isScheduled) {
         router.push(`/room/${res.data.id}`)
       } else {
@@ -147,9 +150,10 @@ export default function DashboardPage() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.greeting}>
-              Привет, {user?.name?.split(' ')[0]} 👋
+              Встречи
             </h1>
             <p className={styles.date}>
+              {user?.name?.split(' ')[0] ? `${user?.name?.split(' ')[0]}, ` : ''}
               {new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}
             </p>
           </div>
@@ -224,25 +228,25 @@ export default function DashboardPage() {
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <h2>Запланированные конференции</h2>
-              <div className={styles.scheduledIndicator} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--color-accent-amber)', fontWeight: 600 }}>
+              <div className={styles.scheduledIndicator}>
                 <CalendarClock size={16} />
                 <span>Ожидают начала</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div className={styles.scheduledList}>
               {scheduledMeetings.map((m) => {
                 const isCopied = copiedId === m.id
                 return (
-                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', justifyContent: 'space-between', transition: 'border-color var(--transition-fast)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flex: 1, minWidth: 0 }}>
-                      <div style={{ background: 'var(--color-accent-blue-dim)', color: 'var(--color-accent-blue)', width: 44, height: 44, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div key={m.id} className={styles.scheduledRow}>
+                    <div className={styles.scheduledInfo}>
+                      <div className={styles.scheduledIcon}>
                         <Calendar size={22} />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.title}</h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <h3 className={styles.scheduledTitle}>{m.title}</h3>
+                        <div className={styles.scheduledMeta}>
+                          <span className={styles.scheduledMetaItem}>
                             <Clock size={12} /> {formatDate(m.scheduledStart!)}
                           </span>
                           {m.isPublic && (
@@ -254,11 +258,10 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <div className={styles.scheduledActions}>
                       <button
                         className="btn btn-ghost btn-sm"
                         onClick={() => handleCopyInvite(m.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
                         title="Скопировать ссылку-приглашение"
                       >
                         {isCopied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
@@ -331,7 +334,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Schedule meeting checkbox */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              <div className={styles.modalOption}>
                 <input
                   id="schedule-toggle"
                   type="checkbox"
@@ -347,9 +350,8 @@ export default function DashboardPage() {
                       setScheduleTime(localDate.toISOString().slice(0, 16))
                     }
                   }}
-                  style={{ width: 16, height: 16, cursor: 'pointer' }}
                 />
-                <label htmlFor="schedule-toggle" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                <label htmlFor="schedule-toggle">
                   Запланировать на определённое время
                 </label>
               </div>
@@ -372,16 +374,28 @@ export default function DashboardPage() {
               )}
 
               {/* Public toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
+              <div className={styles.modalOption} style={{ marginBottom: 'var(--space-4)' }}>
                 <input
                   id="public-toggle"
                   type="checkbox"
                   checked={isPublic}
                   onChange={(e) => setIsPublic(e.target.checked)}
-                  style={{ width: 16, height: 16, cursor: 'pointer' }}
                 />
-                <label htmlFor="public-toggle" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                <label htmlFor="public-toggle">
                   Публичная встреча (разрешить вход гостям без авторизации)
+                </label>
+              </div>
+
+              {/* Waiting Room toggle */}
+              <div className={styles.modalOption} style={{ marginBottom: 'var(--space-6)' }}>
+                <input
+                  id="waiting-room-toggle"
+                  type="checkbox"
+                  checked={waitingRoomEnabled}
+                  onChange={(e) => setWaitingRoomEnabled(e.target.checked)}
+                />
+                <label htmlFor="waiting-room-toggle">
+                  Включить зал ожидания (требуется одобрение организатора)
                 </label>
               </div>
 

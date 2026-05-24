@@ -13,16 +13,59 @@ import {
   useTracks,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
-import { Track, RoomEvent } from 'livekit-client'
+import { Track, RoomEvent, ConnectionQuality, ParticipantEvent } from 'livekit-client'
 import {
   Mic, MicOff, Video, VideoOff, Monitor, Users,
   PhoneOff, Bot, Shield, CheckCircle2, XCircle,
   Circle, StopCircle, X, LogOut, MessageSquare, Send,
-  Globe, Copy, Check, Calendar, Lock
+  Globe, Copy, Check, Calendar, Lock, Hand, Smile, VolumeX
 } from 'lucide-react'
 import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
 import styles from './room.module.css'
+
+// ─── Connection Quality Indicator Component ───────────────────────────────────
+
+function ConnectionQualityBar({ participant }: { participant: any }) {
+  const [quality, setQuality] = useState<ConnectionQuality>(participant.connectionQuality)
+
+  useEffect(() => {
+    const handleQualityChanged = (q: ConnectionQuality) => {
+      setQuality(q)
+    }
+    participant.on(ParticipantEvent.ConnectionQualityChanged, handleQualityChanged)
+    setQuality(participant.connectionQuality)
+    return () => {
+      participant.off(ParticipantEvent.ConnectionQualityChanged, handleQualityChanged)
+    }
+  }, [participant])
+
+  let color = 'rgba(255, 255, 255, 0.2)'
+  let bars = 0
+  let label = 'Неизвестно'
+
+  if (quality === ConnectionQuality.Excellent) {
+    color = 'var(--color-success)'
+    bars = 3
+    label = 'Отличное'
+  } else if (quality === ConnectionQuality.Good) {
+    color = 'var(--color-accent-amber)'
+    bars = 2
+    label = 'Хорошее'
+  } else if (quality === ConnectionQuality.Poor) {
+    color = 'var(--color-danger)'
+    bars = 1
+    label = 'Плохое'
+  }
+
+  return (
+    <div className={styles.qualityIndicator} title={`Качество связи: ${label}`}>
+      <span className={styles.qualityBar} style={{ height: '30%', backgroundColor: bars >= 1 ? color : 'rgba(255,255,255,0.15)' }} />
+      <span className={styles.qualityBar} style={{ height: '60%', backgroundColor: bars >= 2 ? color : 'rgba(255,255,255,0.15)' }} />
+      <span className={styles.qualityBar} style={{ height: '100%', backgroundColor: bars >= 3 ? color : 'rgba(255,255,255,0.15)' }} />
+    </div>
+  )
+}
 
 // ─── Main page (token fetching layer) ─────────────────────────────────────────
 
@@ -43,6 +86,9 @@ export default function RoomPage() {
   const [loggingInGuest, setLoggingInGuest] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  const [isInWaitingRoom, setIsInWaitingRoom] = useState(false)
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
   const init = useCallback(async () => {
     // 1. Try to load authenticated user profile
     const meRes = await authApi.me({ skipRedirect: true })
@@ -57,6 +103,39 @@ export default function RoomPage() {
         setError('Для доступа к этой конференции требуется авторизация')
       }
       return
+    }
+
+    // Check waiting room status
+    const statusRes = await meetingsApi.getWaitingStatus(id)
+    if ('data' in statusRes && statusRes.data) {
+      const { status } = statusRes.data
+      if (status === 'pending') {
+        setIsInWaitingRoom(true)
+        if (!publicInfo) {
+          const pubRes = await meetingsApi.getPublicInfo(id)
+          if ('data' in pubRes && pubRes.data) setPublicInfo(pubRes.data)
+        }
+        return
+      } else if (status === 'rejected') {
+        setError('Организатор отклонил ваш запрос на вход в эту конференцию')
+        return
+      } else if (status === 'none') {
+        // Request to join waiting room
+        const joinRes = await meetingsApi.joinWaitingRoom(id)
+        if ('data' in joinRes && joinRes.data) {
+          if (joinRes.data.status === 'pending') {
+            setIsInWaitingRoom(true)
+            if (!publicInfo) {
+              const pubRes = await meetingsApi.getPublicInfo(id)
+              if ('data' in pubRes && pubRes.data) setPublicInfo(pubRes.data)
+            }
+            return
+          }
+        } else {
+          setError('Не удалось войти в зал ожидания')
+          return
+        }
+      }
     }
 
     // 2. User is authenticated (or logged in as guest). Fetch meeting and LiveKit token.
@@ -79,11 +158,44 @@ export default function RoomPage() {
     setToken(tokenRes.data.token)
     setServerUrl(tokenRes.data.serverUrl)
     setShowWelcome(false)
-  }, [id])
+    setIsInWaitingRoom(false)
+  }, [id, publicInfo])
 
   useEffect(() => {
     init()
-  }, [init])
+  }, [id])
+
+  // Poll waiting room status
+  useEffect(() => {
+    if (!isInWaitingRoom) {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+      return
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
+      const res = await meetingsApi.getWaitingStatus(id)
+      if ('data' in res && res.data) {
+        const { status } = res.data
+        if (status === 'admitted') {
+          setIsInWaitingRoom(false)
+          init()
+        } else if (status === 'rejected') {
+          setIsInWaitingRoom(false)
+          setError('Организатор отклонил ваш запрос на вход в эту конференцию')
+        }
+      }
+    }, 2000)
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+    }
+  }, [isInWaitingRoom, id, init])
 
   const handleGuestJoin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -222,6 +334,65 @@ export default function RoomPage() {
     )
   }
 
+  if (isInWaitingRoom && publicInfo) {
+    return (
+      <div className={styles.welcomeLayout}>
+        <div className={styles.welcomeCard}>
+          <div className={styles.welcomeHeader}>
+            <div className={styles.welcomeLogo}>
+              <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
+                <defs>
+                  <linearGradient id="waitingLogoGrad" x1="0" y1="0" x2="36" y2="36">
+                    <stop offset="0%" stopColor="#E50012"/>
+                    <stop offset="50%" stopColor="#8A005A"/>
+                    <stop offset="100%" stopColor="#0033A0"/>
+                  </linearGradient>
+                </defs>
+                <rect x="2" y="10" width="18" height="16" rx="4" fill="url(#waitingLogoGrad)"/>
+                <path d="M20 14L27 10V26L20 22V14Z" fill="url(#waitingLogoGrad)"/>
+                <path d="M31 13C32.5 15 32.5 21 31 23" stroke="url(#waitingLogoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <h1 className={styles.welcomeTitle}>Зал ожидания</h1>
+            <p className={styles.welcomeSubtitle}>Centras Echo · Контроль доступа</p>
+          </div>
+
+          <div className={styles.meetingInfoBox}>
+            <h2 className={styles.meetingInfoTitle}>{publicInfo.title}</h2>
+            
+            <div className={styles.meetingInfoRow}>
+              <span>Организатор:</span>
+              <span style={{ fontWeight: 600 }}>{publicInfo.creatorName ?? 'Система'}</span>
+            </div>
+
+            <div className={styles.meetingInfoRow}>
+              <span>Статус:</span>
+              <span style={{ color: 'var(--color-accent-amber)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Circle size={10} fill="var(--color-accent-amber)" /> Ожидание одобрения...
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 'var(--space-4) 0' }}>
+            <div className={styles.loadingSpinner} />
+            <p style={{ textAlign: 'center', fontSize: '0.875rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Вы в зале ожидания. Пожалуйста, подождите, пока организатор одобрит ваше участие во встрече.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ width: '100%', marginTop: 8 }}
+            onClick={() => router.push('/dashboard')}
+          >
+            Вернуться на главную
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (!token || !meeting || !user) {
     return (
       <div className={styles.loadingRoom}>
@@ -288,6 +459,21 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
+  // Reactions + Raise Hand states
+  const [raisedHands, setRaisedHands] = useState<Record<string, boolean>>({})
+  const [floatingReactions, setFloatingReactions] = useState<Array<{ id: string; identity: string; emoji: string }>>([])
+  const [showReactionsMenu, setShowReactionsMenu] = useState(false)
+
+  // Waiting Room state for host
+  const [waitingUsers, setWaitingUsers] = useState<any[]>([])
+  const prevWaitingCountRef = useRef(0)
+
+  // Noise Suppression state
+  const [noiseSuppression, setNoiseSuppression] = useState(false)
+  const nsCtxRef = useRef<AudioContext | null>(null)
+  const nsOriginalTrackRef = useRef<any>(null)
+  const nsPublishedTrackRef = useRef<any>(null)
+
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -339,6 +525,46 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     return () => clearInterval(iv)
   }, [showSenti, pollConsent])
 
+  // Poll waiting room if host
+  useEffect(() => {
+    if (!isHost) return
+    const fetchWaiting = async () => {
+      const res = await meetingsApi.getWaitingList(meetingId)
+      if ('data' in res && res.data) {
+        setWaitingUsers(res.data)
+      }
+    }
+    fetchWaiting()
+    const iv = setInterval(fetchWaiting, 3000)
+    return () => clearInterval(iv)
+  }, [isHost, meetingId])
+
+  // Audio chime if user joins waiting room
+  useEffect(() => {
+    if (waitingUsers.length > prevWaitingCountRef.current) {
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime) // D5
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15) // A5
+        
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4)
+        
+        osc.start()
+        osc.stop(audioCtx.currentTime + 0.4)
+      } catch (e) {
+        // Autoplay policy bypass
+      }
+    }
+    prevWaitingCountRef.current = waitingUsers.length
+  }, [waitingUsers])
+
   // Listen to LiveKit DataChannel
   useEffect(() => {
     const handleDataReceived = (payload: Uint8Array, participant: any) => {
@@ -360,6 +586,14 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
           setIsRecording(true)
         } else if (data.type === 'recording_stopped') {
           setIsRecording(false)
+        } else if (data.type === 'raise_hand') {
+          setRaisedHands((prev) => ({ ...prev, [participant.identity]: data.raised }))
+        } else if (data.type === 'reaction') {
+          const id = Math.random().toString(36).substr(2, 9)
+          setFloatingReactions((prev) => [...prev, { id, identity: participant.identity, emoji: data.emoji }])
+          setTimeout(() => {
+            setFloatingReactions((prev) => prev.filter((r) => r.id !== id))
+          }, 3000)
         } else if (data.type === 'chat') {
           const newMsg: ChatMessage = {
             id: Math.random().toString(36).substr(2, 9),
@@ -376,9 +610,19 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
       }
     }
 
+    const handleParticipantDisconnected = (p: any) => {
+      setRaisedHands((prev) => {
+        const copy = { ...prev }
+        delete copy[p.identity]
+        return copy
+      })
+    }
+
     room.on(RoomEvent.DataReceived, handleDataReceived)
+    room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
     return () => {
       room.off(RoomEvent.DataReceived, handleDataReceived)
+      room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
     }
   }, [room, isHost, pollConsent, showChat, localParticipant])
 
@@ -390,6 +634,133 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
       await localParticipant.publishData(data, { reliable: true })
     } catch (err) {
       console.error('Failed to broadcast mute participant signal:', err)
+    }
+  }
+
+  // Waiting Room Host Actions
+  const handleAdmit = async (targetUserId: string) => {
+    const res = await meetingsApi.admitUser(meetingId, targetUserId)
+    if ('data' in res) {
+      setWaitingUsers((prev) => prev.filter((u) => u.userId !== targetUserId))
+    }
+  }
+
+  const handleReject = async (targetUserId: string) => {
+    const res = await meetingsApi.rejectUser(meetingId, targetUserId)
+    if ('data' in res) {
+      setWaitingUsers((prev) => prev.filter((u) => u.userId !== targetUserId))
+    }
+  }
+
+  // Reactions & Raise Hand Actions
+  const sendReaction = async (emoji: string) => {
+    if (!localParticipant) return
+    try {
+      const encoder = new TextEncoder()
+      const data = encoder.encode(JSON.stringify({ type: 'reaction', emoji }))
+      await localParticipant.publishData(data, { reliable: true })
+      
+      // Show locally immediately
+      const id = Math.random().toString(36).substr(2, 9)
+      setFloatingReactions((prev) => [...prev, { id, identity: localParticipant.identity, emoji }])
+      setTimeout(() => {
+        setFloatingReactions((prev) => prev.filter((r) => r.id !== id))
+      }, 3000)
+    } catch (err) {
+      console.error('Failed to publish reaction:', err)
+    }
+    setShowReactionsMenu(false)
+  }
+
+  const toggleRaiseHand = async () => {
+    if (!localParticipant) return
+    try {
+      const nextState = !raisedHands[localParticipant.identity]
+      setRaisedHands((prev) => ({ ...prev, [localParticipant.identity]: nextState }))
+      
+      const encoder = new TextEncoder()
+      const data = encoder.encode(JSON.stringify({ type: 'raise_hand', raised: nextState }))
+      await localParticipant.publishData(data, { reliable: true })
+    } catch (err) {
+      console.error('Failed to publish raise hand:', err)
+    }
+  }
+
+  // Noise Suppression Action
+  const toggleNoiseSuppression = async () => {
+    if (!localParticipant) return
+    try {
+      if (noiseSuppression) {
+        setNoiseSuppression(false)
+        if (nsCtxRef.current) {
+          await nsCtxRef.current.close()
+          nsCtxRef.current = null
+        }
+        if (nsPublishedTrackRef.current) {
+          await localParticipant.unpublishTrack(nsPublishedTrackRef.current.track)
+          nsPublishedTrackRef.current = null
+        }
+        // Restore default mic
+        await localParticipant.setMicrophoneEnabled(true)
+        setMicEnabled(true)
+      } else {
+        setNoiseSuppression(true)
+        
+        // 1. Get raw media stream from microphone
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+        
+        // 2. Web Audio setup
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+        const ctx = new AudioContextClass()
+        nsCtxRef.current = ctx
+        
+        const source = ctx.createMediaStreamSource(stream)
+        
+        // Low frequency cut filter (120Hz highpass)
+        const hpFilter = ctx.createBiquadFilter()
+        hpFilter.type = 'highpass'
+        hpFilter.frequency.value = 120
+        
+        // High frequency bandpass to keep speech range (80Hz to 6000Hz)
+        const lpFilter = ctx.createBiquadFilter()
+        lpFilter.type = 'lowpass'
+        lpFilter.frequency.value = 6000
+        
+        // Noise Gate compressor
+        const gate = ctx.createDynamicsCompressor()
+        gate.threshold.value = -42 // Attenuate audio below -42dB
+        gate.knee.value = 12
+        gate.ratio.value = 15
+        gate.attack.value = 0.003 // Quick open
+        gate.release.value = 0.12 // Smooth close
+        
+        const dest = ctx.createMediaStreamDestination()
+        
+        source.connect(hpFilter)
+        hpFilter.connect(lpFilter)
+        lpFilter.connect(gate)
+        gate.connect(dest)
+        
+        const cleanTrack = dest.stream.getAudioTracks()[0]
+        
+        // Unpublish current microphone
+        const micPublication = localParticipant.getTrackPublication(Track.Source.Microphone)
+        if (micPublication && micPublication.track) {
+          nsOriginalTrackRef.current = micPublication.track
+          await localParticipant.unpublishTrack(micPublication.track)
+        }
+        
+        // Publish clean track
+        const pub = await localParticipant.publishTrack(cleanTrack, {
+          name: 'microphone-clean',
+          source: Track.Source.Microphone
+        })
+        nsPublishedTrackRef.current = pub
+        setMicEnabled(true)
+      }
+    } catch (err) {
+      console.error('Failed to toggle noise suppression:', err)
+      setNoiseSuppression(false)
     }
   }
 
@@ -639,6 +1010,29 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
           <span className={styles.sidebarTitle}>Участники</span>
           <span className={styles.participantCount}>{allParticipants.length}</span>
         </div>
+
+        {/* Waiting Room Section for Host */}
+        {isHost && waitingUsers.length > 0 && (
+          <div className={styles.waitingRoomSection}>
+            <div className={styles.waitingRoomSubheader}>В зале ожидания ({waitingUsers.length})</div>
+            <div className={styles.waitingList}>
+              {waitingUsers.map((u) => (
+                <div key={u.userId} className={styles.waitingItem}>
+                  <span className={styles.waitingName} title={u.name}>{u.name}</span>
+                  <div className={styles.waitingActions}>
+                    <button className={styles.waitBtnAdmit} onClick={() => handleAdmit(u.userId)} title="Разрешить вход">
+                      <Check size={12} />
+                    </button>
+                    <button className={styles.waitBtnReject} onClick={() => handleReject(u.userId)} title="Отклонить">
+                      <X size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className={styles.participantsList}>
           {allParticipants.map((p) => {
             const isSpeaking = p.isSpeaking
@@ -665,6 +1059,10 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                   )}
                 </div>
                 <div className={styles.participantIcons}>
+                  {raisedHands[p.identity] && (
+                    <span className={styles.raisedHandSidebarBadge} title="Поднята рука">✋</span>
+                  )}
+                  <ConnectionQualityBar participant={p} />
                   {isMuted ? (
                     <MicOff size={14} className={styles.mutedIcon} />
                   ) : (
@@ -710,6 +1108,20 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
           <GridLayout tracks={tracks} style={{ height: '100%' }}>
             <ParticipantTile />
           </GridLayout>
+
+          {/* Floating reactions layer */}
+          <div className={styles.reactionsLayer}>
+            {floatingReactions.map((reaction) => {
+              const p = allParticipants.find((x) => x.identity === reaction.identity)
+              const name = p?.name || 'Участник'
+              return (
+                <div key={reaction.id} className={styles.floatingReaction}>
+                  <span className={styles.reactionEmoji}>{reaction.emoji}</span>
+                  <span className={styles.reactionName}>{name}</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         {/* Controls */}
@@ -728,7 +1140,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
             </Tooltip>
           </div>
 
-          {/* Center: mic, cam, screen, end */}
+          {/* Center: mic, cam, screen, hand, reactions, noise suppression, end */}
           <div className={styles.controlsCenter}>
             <div className={styles.controlGroup}>
               <Tooltip label={micEnabled ? 'Выключить микрофон' : 'Включить микрофон'}>
@@ -772,6 +1184,69 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
               <span className={styles.controlLabel}>{screenSharing ? 'Трансляция' : 'Экран'}</span>
             </div>
 
+            {/* Raise Hand */}
+            <div className={styles.controlGroup}>
+              <Tooltip label={raisedHands[localParticipant?.identity || ''] ? 'Опустить руку' : 'Поднять руку'}>
+                <button
+                  id="toggle-raise-hand-btn"
+                  className={`${styles.controlBtn} ${raisedHands[localParticipant?.identity || ''] ? styles.active : ''}`}
+                  onClick={toggleRaiseHand}
+                  aria-label="Поднять руку"
+                >
+                  <Hand size={20} />
+                </button>
+              </Tooltip>
+              <span className={styles.controlLabel}>
+                {raisedHands[localParticipant?.identity || ''] ? 'Опустить' : 'Поднять'}
+              </span>
+            </div>
+
+            {/* Reactions (Smile menu) */}
+            <div className={styles.controlGroup} style={{ position: 'relative' }}>
+              <Tooltip label="Реакции">
+                <button
+                  id="toggle-reactions-btn"
+                  className={`${styles.controlBtn} ${showReactionsMenu ? styles.active : ''}`}
+                  onClick={() => setShowReactionsMenu((v) => !v)}
+                  aria-label="Реакции"
+                >
+                  <Smile size={20} />
+                </button>
+              </Tooltip>
+              <span className={styles.controlLabel}>Реакции</span>
+              
+              {showReactionsMenu && (
+                <div className={styles.reactionsMenu}>
+                  {['👍', '👏', '❤️', '😂', '🎉', '😮'].map((emoji) => (
+                    <button
+                      key={emoji}
+                      className={styles.reactionMenuBtn}
+                      onClick={() => sendReaction(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Noise Suppression */}
+            <div className={styles.controlGroup}>
+              <Tooltip label={noiseSuppression ? 'Отключить шумоподавление' : 'Включить шумоподавление'}>
+                <button
+                  id="toggle-noise-suppression-btn"
+                  className={`${styles.controlBtn} ${noiseSuppression ? styles.active : ''}`}
+                  onClick={toggleNoiseSuppression}
+                  aria-label="Шумоподавление"
+                >
+                  <VolumeX size={20} />
+                </button>
+              </Tooltip>
+              <span className={styles.controlLabel}>
+                {noiseSuppression ? 'Шум откл.' : 'Шумопод.'}
+              </span>
+            </div>
+
             <button
               id="end-call-btn"
               className={styles.endCallBtn}
@@ -809,7 +1284,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                   id="toggle-senti-btn"
                   className={`${styles.controlBtn} ${showSenti ? styles.sentiActive : ''}`}
                   onClick={() => setShowSenti((v) => !v)}
-                  aria-label="Senti AI протокол"
+                  aria-label="Senti протокол"
                 >
                   <Bot size={20} />
                 </button>
@@ -907,7 +1382,6 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
             <div className={styles.sentiTitle}>
               <Bot size={18} color="var(--color-accent-amber)" />
               <span className="senti-text">Senti</span>
-              <span className={styles.sentiBeta}>AI</span>
             </div>
             <button
               className={`${styles.controlBtn} btn-sm`}

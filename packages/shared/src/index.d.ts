@@ -25,6 +25,9 @@ export interface Meeting {
     sentiStatus: SentiStatus;
     summary?: SentiSummary;
     participants?: MeetingParticipant[];
+    scheduledStart?: string | null;
+    isPublic?: boolean;
+    waitingRoomEnabled?: boolean;
 }
 export interface MeetingParticipant {
     userId: string;

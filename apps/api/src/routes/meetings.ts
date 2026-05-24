@@ -8,6 +8,7 @@ const CreateMeetingSchema = z.object({
   title: z.string().min(1).max(200),
   scheduledStart: z.string().datetime().optional().nullable(),
   isPublic: z.boolean().optional(),
+  waitingRoomEnabled: z.boolean().optional(),
 })
 
 // Helper: verify user is a participant of a meeting
@@ -74,6 +75,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
            m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
            m.senti_status AS "sentiStatus", m.summary,
            m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
+           m.waiting_room_enabled AS "waitingRoomEnabled",
            json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
            (
              SELECT json_agg(json_build_object(
@@ -103,13 +105,13 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: body.error.message } })
       }
 
-      const { title, scheduledStart, isPublic } = body.data
+      const { title, scheduledStart, isPublic, waitingRoomEnabled } = body.data
       const roomName = `centras-${randomUUID()}`
       const result = await pool.query(
-        `INSERT INTO meetings (title, creator_id, livekit_room, scheduled_start, is_public)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, title, creator_id AS "creatorId", livekit_room AS "livekitRoom", created_at AS "createdAt", scheduled_start AS "scheduledStart", is_public AS "isPublic", is_recorded AS "isRecorded", senti_status AS "sentiStatus"`,
-        [title, user.sub, roomName, scheduledStart ? new Date(scheduledStart) : null, isPublic ?? false],
+        `INSERT INTO meetings (title, creator_id, livekit_room, scheduled_start, is_public, waiting_room_enabled)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, title, creator_id AS "creatorId", livekit_room AS "livekitRoom", created_at AS "createdAt", scheduled_start AS "scheduledStart", is_public AS "isPublic", waiting_room_enabled AS "waitingRoomEnabled", is_recorded AS "isRecorded", senti_status AS "sentiStatus"`,
+        [title, user.sub, roomName, scheduledStart ? new Date(scheduledStart) : null, isPublic ?? false, waitingRoomEnabled ?? false],
       )
 
       const meeting = result.rows[0]
@@ -149,6 +151,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
            m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
            m.senti_status AS "sentiStatus", m.summary,
            m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
+           m.waiting_room_enabled AS "waitingRoomEnabled",
            json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
            (
              SELECT json_agg(json_build_object(
@@ -319,6 +322,150 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       })
 
       return reply.send({ data: { success: true, sentiStatus: 'processing' } })
+    })
+
+    // ─── Waiting Room Routes ────────────────────────────────────────────────
+    
+    app.get('/:id/waiting-room/status', async (request, reply) => {
+      const user = request.user as { sub: string }
+      const { id } = request.params as { id: string }
+
+      const meetingRes = await pool.query(
+        'SELECT creator_id, waiting_room_enabled FROM meetings WHERE id = $1',
+        [id]
+      )
+      const meeting = meetingRes.rows[0]
+      if (!meeting) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+
+      if (meeting.creator_id === user.sub || !meeting.waiting_room_enabled) {
+        return reply.send({ data: { status: 'admitted' } })
+      }
+
+      const participantCheck = await pool.query(
+        'SELECT 1 FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
+        [id, user.sub]
+      )
+      if (participantCheck.rows.length > 0) {
+        return reply.send({ data: { status: 'admitted' } })
+      }
+
+      const waitingRes = await pool.query(
+        'SELECT status FROM meeting_waiting_room WHERE meeting_id = $1 AND user_id = $2',
+        [id, user.sub]
+      )
+      
+      if (waitingRes.rows.length === 0) {
+        return reply.send({ data: { status: 'none' } })
+      }
+
+      return reply.send({ data: { status: waitingRes.rows[0].status } })
+    })
+
+    app.post('/:id/waiting-room/join', async (request, reply) => {
+      const user = request.user as { sub: string }
+      const { id } = request.params as { id: string }
+
+      const meetingRes = await pool.query('SELECT creator_id, waiting_room_enabled FROM meetings WHERE id = $1', [id])
+      if (!meetingRes.rows[0]) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+
+      if (!meetingRes.rows[0].waiting_room_enabled || meetingRes.rows[0].creator_id === user.sub) {
+        await pool.query(
+          'INSERT INTO meeting_participants (meeting_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [id, user.sub]
+        )
+        return reply.send({ data: { status: 'admitted' } })
+      }
+
+      await pool.query(
+        `INSERT INTO meeting_waiting_room (meeting_id, user_id, status)
+         VALUES ($1, $2, 'pending')
+         ON CONFLICT (meeting_id, user_id) DO UPDATE SET status = 'pending'`,
+        [id, user.sub]
+      )
+
+      return reply.send({ data: { status: 'pending' } })
+    })
+
+    app.get('/:id/waiting-room', async (request, reply) => {
+      const user = request.user as { sub: string }
+      const { id } = request.params as { id: string }
+
+      const meetingRes = await pool.query('SELECT creator_id FROM meetings WHERE id = $1', [id])
+      if (!meetingRes.rows[0]) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+
+      if (meetingRes.rows[0].creator_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only creator can view waiting room' } })
+      }
+
+      const result = await pool.query(
+        `SELECT wr.id, wr.user_id AS "userId", wr.status, wr.created_at AS "createdAt",
+                u.name, u.avatar_url AS "avatarUrl", u.email
+         FROM meeting_waiting_room wr
+         JOIN users u ON u.id = wr.user_id
+         WHERE wr.meeting_id = $1 AND wr.status = 'pending'
+         ORDER BY wr.created_at ASC`,
+        [id]
+      )
+
+      return reply.send({ data: result.rows })
+    })
+
+    app.post('/:id/waiting-room/:userId/admit', async (request, reply) => {
+      const user = request.user as { sub: string }
+      const { id, userId } = request.params as { id: string; userId: string }
+
+      const meetingRes = await pool.query('SELECT creator_id FROM meetings WHERE id = $1', [id])
+      if (!meetingRes.rows[0]) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+
+      if (meetingRes.rows[0].creator_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only creator can admit users' } })
+      }
+
+      await pool.query(
+        "UPDATE meeting_waiting_room SET status = 'admitted' WHERE meeting_id = $1 AND user_id = $2",
+        [id, userId]
+      )
+
+      await pool.query(
+        'INSERT INTO meeting_participants (meeting_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [id, userId]
+      )
+
+      return reply.send({ data: { admitted: true } })
+    })
+
+    app.post('/:id/waiting-room/:userId/reject', async (request, reply) => {
+      const user = request.user as { sub: string }
+      const { id, userId } = request.params as { id: string; userId: string }
+
+      const meetingRes = await pool.query('SELECT creator_id FROM meetings WHERE id = $1', [id])
+      if (!meetingRes.rows[0]) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+
+      if (meetingRes.rows[0].creator_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only creator can reject users' } })
+      }
+
+      await pool.query(
+        "UPDATE meeting_waiting_room SET status = 'rejected' WHERE meeting_id = $1 AND user_id = $2",
+        [id, userId]
+      )
+
+      await pool.query(
+        'DELETE FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
+        [id, userId]
+      )
+
+      return reply.send({ data: { rejected: true } })
     })
   })
 }

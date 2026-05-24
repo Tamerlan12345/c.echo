@@ -3,6 +3,7 @@
 .layout {
   display: flex;
   min-height: 100dvh;
+  background: var(--color-bg-primary);
 }
 
 .main {
@@ -20,6 +21,7 @@
   padding: var(--space-5) var(--space-8);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
   flex-shrink: 0;
 }
 
@@ -48,8 +50,8 @@
 
 .meetingTitle {
   font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .meetingMeta {
@@ -74,7 +76,8 @@
   display: flex;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-surface);
-  padding: 0 var(--space-8);
+  padding: var(--space-3) var(--space-8);
+  gap: var(--space-2);
   flex-shrink: 0;
 }
 
@@ -82,25 +85,29 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-4) var(--space-2);
+  padding: 9px 12px;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--color-text-muted);
   cursor: pointer;
-  border: none;
-  background: none;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--radius-md);
   transition:
     color var(--transition-fast),
     border-color var(--transition-fast);
-  margin-right: var(--space-5);
+  margin-right: 0;
 }
 
-.tab:hover { color: var(--color-text-primary); }
+.tab:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-2);
+}
 
 .tabActive {
   color: var(--color-accent-blue);
-  border-bottom-color: var(--color-accent-blue);
+  background: var(--color-accent-blue-dim);
+  border-color: rgba(0, 51, 160, 0.22);
 }
 
 /* ─── Tab content ────────────────────────────────────────────────────────────── */
@@ -125,6 +132,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
 }
 
 .protocolCardTitle {
@@ -135,7 +143,7 @@
   font-weight: 600;
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   margin-bottom: var(--space-4);
 }
 
@@ -348,7 +356,7 @@
 .chatAvatar {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   background: var(--color-bg-surface-2);
   border: 1px solid var(--color-border);
   display: flex;
@@ -366,9 +374,9 @@
 }
 
 .chatBubbleUser {
-  background: var(--color-accent-blue-dim);
-  border: 1px solid rgba(138, 0, 90, 0.28);
-  color: var(--color-text-primary);
+  background: var(--color-accent-blue);
+  border: 1px solid rgba(0, 51, 160, 0.28);
+  color: #FFFFFF;
   border-radius: var(--radius-md) var(--radius-md) 4px var(--radius-md);
 }
 
@@ -444,13 +452,13 @@
   background: var(--gradient-accent);
   color: #FFFFFF;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(138, 0, 90, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-fast), transform var(--transition-fast);
   flex-shrink: 0;
 }
 
 .chatSendBtn:hover {
-  box-shadow: 0 6px 22px rgba(138, 0, 90, 0.55), 0 0 20px rgba(229, 0, 18, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.20);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
@@ -516,7 +524,7 @@
 .noSentiIcon {
   width: 64px;
   height: 64px;
-  border-radius: 50%;
+  border-radius: var(--radius-lg);
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   display: flex;
@@ -536,63 +544,291 @@
   margin: 0 auto;
 }
 
+@media (max-width: 700px) {
+  .header,
+  .tabs,
+  .tabContent { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .titleRow { flex-direction: column; }
+  .tabs { overflow-x: auto; }
+  .chatBubble { max-width: 100%; }
+}
+
 @media (max-width: 900px) {
   .protocolGrid { grid-template-columns: 1fr; }
   .tabContent { padding: var(--space-5); }
 }
 
+.printOnlyContainer {
+  display: none;
+}
+
 @media print {
-  .breadcrumb,
+  /* Hide the screen layout and elements completely */
+  .layout,
+  .sidebar,
+  .main,
+  .header,
   .tabs,
-  #export-pdf-btn,
-  .chatForm,
-  .chatInput,
-  .chatSendBtn {
+  .tabContent {
     display: none !important;
   }
 
-  .layout {
+  .printOnlyContainer {
     display: block !important;
-    background: white !important;
-    color: #000 !important;
-    padding: 0 !important;
-  }
-
-  .main {
+    background: #ffffff !important;
+    color: #121826 !important;
+    font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     padding: 0 !important;
     margin: 0 !important;
-    background: white !important;
-    color: #000 !important;
-    max-height: none !important;
-    overflow: visible !important;
-    width: 100% !important;
   }
 
-  .tabContent {
-    overflow: visible !important;
-    padding: 0 !important;
+  .printHeader {
+    border-bottom: 2px solid #0033A0;
+    padding-bottom: 20px;
+    margin-bottom: 30px;
   }
 
-  .protocolCard {
-    background: white !important;
-    color: #000 !important;
-    border: 1px solid #ddd !important;
-    box-shadow: none !important;
+  .printLogo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .printLogoTitle {
+    font-size: 1.375rem;
+    font-weight: 800;
+    color: #0033A0;
+  }
+
+  .printDocType {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #8A005A;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+
+  .printTitle {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #121826;
+    margin: 8px 0;
+    line-height: 1.25;
+  }
+
+  .printMetaGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .printMetaItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .printMetaLabel {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    color: #667085;
+    letter-spacing: 0.02em;
+  }
+
+  .printMetaVal {
+    color: #121826;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .printParticipantList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .printParticipantBadge {
+    background: #EEF2F6 !important;
+    border: 1px solid #D9E0EA !important;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    color: #344054;
+    font-weight: 500;
+  }
+
+  .printSection {
+    margin-bottom: 32px;
     page-break-inside: avoid;
-    margin-bottom: var(--space-4) !important;
   }
 
-  .decisionItem,
-  .taskItem,
-  .keyMoment {
+  .printSectionTitle {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: #0033A0;
+    border-bottom: 2px solid #EEF2F6;
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .printSummaryText {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #344054;
+    text-align: justify;
+  }
+
+  .printMetricsGrid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .printMetricCard {
+    border: 1px solid #D9E0EA;
+    border-radius: 6px;
+    padding: 10px 6px;
+    text-align: center;
+    background: #F8FAFC !important;
     page-break-inside: avoid;
-    border-bottom: 1px solid #eee !important;
   }
 
-  .summaryText,
-  .decisionText,
-  .taskText,
-  .keyMomentLabel {
-    color: #000 !important;
+  .printMetricVal {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0033A0;
+  }
+
+  .printMetricLabel {
+    font-size: 0.625rem;
+    color: #667085;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .printTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 0.8125rem;
+  }
+
+  .printTable th {
+    background: #EEF2F6 !important;
+    color: #121826;
+    text-align: left;
+    padding: 6px 10px;
+    font-weight: 700;
+    border: 1px solid #D9E0EA;
+  }
+
+  .printTable td {
+    padding: 6px 10px;
+    border: 1px solid #D9E0EA;
+    color: #344054;
+  }
+
+  .printTable tr:nth-child(even) {
+    background: #F8FAFC !important;
+  }
+
+  .printDecisionStatus {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .printDecisionApproved {
+    background: rgba(15, 159, 110, 0.1) !important;
+    color: #0F9F6E !important;
+    border: 1px solid rgba(15, 159, 110, 0.2) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .printDecisionRejected {
+    background: rgba(217, 45, 32, 0.1) !important;
+    color: #D92D20 !important;
+    border: 1px solid rgba(217, 45, 32, 0.2) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .printDecisionPending {
+    background: rgba(102, 112, 133, 0.1) !important;
+    color: #667085 !important;
+    border: 1px solid rgba(102, 112, 133, 0.2) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .printKeyMoments {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .printKeyMoment {
+    display: flex;
+    gap: 12px;
+    font-size: 0.8125rem;
+    border-bottom: 1px dashed #E2E8F0;
+    padding-bottom: 4px;
+    page-break-inside: avoid;
+  }
+
+  .printKeyMomentTime {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: #8A005A;
+    min-width: 44px;
+  }
+
+  .printKeyMomentLabel {
+    color: #344054;
+  }
+
+  .printTranscriptList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .printTranscriptEntry {
+    display: flex;
+    gap: 12px;
+    font-size: 0.8125rem;
+    page-break-inside: avoid;
+    line-height: 1.5;
+  }
+
+  .printTranscriptTime {
+    font-family: 'JetBrains Mono', monospace;
+    color: #0033A0;
+    font-weight: 600;
+    min-width: 44px;
+    flex-shrink: 0;
+  }
+
+  .printTranscriptSpeaker {
+    font-weight: 700;
+    color: #121826;
+    margin-bottom: 1px;
+  }
+
+  .printTranscriptPhrase {
+    color: #344054;
   }
 }

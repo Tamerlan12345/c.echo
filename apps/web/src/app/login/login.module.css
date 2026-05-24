@@ -3,32 +3,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
+  padding: var(--space-6);
   position: relative;
   overflow: hidden;
-  background: var(--color-bg-primary);
+  background:
+    linear-gradient(90deg, rgba(229, 0, 18, 0.05), transparent 24%),
+    linear-gradient(180deg, #FFFFFF 0%, var(--color-bg-primary) 100%);
 }
 
-/* Dot-grid background */
 .container::before {
   content: '';
   position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, rgba(138, 0, 90, 0.18) 1px, transparent 1px);
-  background-size: 28px 28px;
-  opacity: 0.55;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: linear-gradient(180deg, #E50012 0%, #8A005A 48%, #0033A0 100%);
   pointer-events: none;
 }
 
-/* Static corner gradient accents */
 .container::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 55% 45% at 8% 0%,   rgba(229, 0, 18, 0.09)  0%, transparent 100%),
-    radial-gradient(ellipse 45% 40% at 92% 100%, rgba(0,  51, 160, 0.10) 0%, transparent 100%);
-  pointer-events: none;
+  content: none;
 }
 
 /* Card */
@@ -37,14 +30,11 @@
   z-index: 1;
   width: 100%;
   max-width: 420px;
-  background:
-    radial-gradient(at 0% 0%, rgba(229, 0, 18, 0.06), transparent 55%),
-    radial-gradient(at 100% 100%, rgba(0, 51, 160, 0.08), transparent 55%),
-    var(--color-bg-surface);
+  background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   padding: var(--space-8);
-  box-shadow: var(--shadow-lg), 0 0 60px rgba(138, 0, 90, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow-lg);
   animation: fade-up 0.5s ease both;
 }
 
@@ -57,7 +47,6 @@
 }
 .logoIcon {
   flex-shrink: 0;
-  filter: drop-shadow(0 0 18px rgba(138, 0, 90, 0.45));
 }
 .logoTitle {
   font-size: 1.625rem;
@@ -120,7 +109,7 @@
   gap: var(--space-3);
   width: 100%;
   padding: 13px 20px;
-  background: var(--color-bg-surface-2);
+  background: #FFFFFF;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
@@ -135,9 +124,9 @@
     transform var(--transition-fast);
 }
 .googleBtn:hover:not(:disabled) {
-  background: var(--color-bg-surface);
+  background: var(--color-bg-primary);
   border-color: var(--color-border-hover);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
 .googleBtn:active:not(:disabled) { transform: scale(0.98); }
@@ -177,8 +166,7 @@
 .sentiDot {
   width: 5px; height: 5px;
   border-radius: 50%;
-  background: var(--color-accent-blue);
-  box-shadow: 0 0 6px rgba(138, 0, 90, 0.55);
+  background: var(--color-accent-amber);
 }
 .sentiLabel {
   font-size: 0.8125rem;

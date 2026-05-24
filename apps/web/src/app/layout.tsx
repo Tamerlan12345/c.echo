@@ -2,15 +2,15 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Centras.Echo — Корпоративные видеоконференции с ИИ',
-  description: 'Защищённая платформа видеозвонков с умным ИИ-ассистентом Senti для автоматического протоколирования встреч',
-  keywords: 'видеоконференции, корпоративные звонки, ИИ-протоколирование, Centras',
+  title: 'Centras.Echo — Корпоративные видеоконференции',
+  description: 'Защищённая платформа видеозвонков с протоколированием встреч через Senti',
+  keywords: 'видеоконференции, корпоративные звонки, протоколирование встреч, Centras',
   icons: {
     icon: '/logo.svg',
   },
   openGraph: {
     title: 'Centras.Echo',
-    description: 'Корпоративные видеоконференции с ИИ-ассистентом Senti',
+    description: 'Корпоративные видеоконференции с протоколами Senti',
     type: 'website',
   },
 }

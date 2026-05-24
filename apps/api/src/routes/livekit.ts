@@ -70,7 +70,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
 
     // Load meeting
     const meetingResult = await pool.query(
-      'SELECT id, livekit_room, ended_at FROM meetings WHERE id = $1',
+      'SELECT id, livekit_room, ended_at, creator_id, waiting_room_enabled FROM meetings WHERE id = $1',
       [meetingId],
     )
     const meeting = meetingResult.rows[0]
@@ -79,6 +79,20 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     }
     if (meeting.ended_at) {
       return reply.status(400).send({ error: { code: 'MEETING_ENDED', message: 'Meeting has ended' } })
+    }
+
+    // Enforce waiting room check for non-hosts
+    if (meeting.waiting_room_enabled && meeting.creator_id !== user.sub) {
+      const waitResult = await pool.query(
+        'SELECT status FROM meeting_waiting_room WHERE meeting_id = $1 AND user_id = $2',
+        [meetingId, user.sub]
+      )
+      const status = waitResult.rows[0]?.status
+      if (status !== 'admitted') {
+        return reply.status(403).send({
+          error: { code: 'WAITING_ROOM', message: 'Вы должны быть одобрены организатором для входа' }
+        })
+      }
     }
 
     // Enforce participant limit

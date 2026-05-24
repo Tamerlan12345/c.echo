@@ -102,7 +102,7 @@ function LoginContent() {
         <div className={styles.sentiFooter}>
           <div className={styles.sentiDot} aria-hidden="true" />
           <span className={styles.sentiLabel}>
-            <span className="senti-text">Senti AI</span>&nbsp;·&nbsp;Умный секретарь ваших встреч
+            <span className="senti-text">Senti</span>&nbsp;·&nbsp;Протокол встреч без ручных заметок
           </span>
         </div>
       </div>

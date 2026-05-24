@@ -137,6 +137,28 @@ export default function ProtocolPage() {
   const hasSenti = meeting.sentiStatus === 'done'
   const isProcessing = meeting.sentiStatus === 'processing'
 
+  // Calculate metrics
+  const totalPhrases = transcript.length
+  const totalWords = transcript.reduce((acc, entry) => acc + (entry.phrase?.split(/\s+/).filter(Boolean).length || 0), 0)
+
+  // Speaker breakdown
+  const speakerMap: Record<string, { phrases: number; words: number }> = {}
+  transcript.forEach((entry) => {
+    const speaker = entry.speakerName || 'Неизвестный'
+    if (!speakerMap[speaker]) {
+      speakerMap[speaker] = { phrases: 0, words: 0 }
+    }
+    speakerMap[speaker].phrases += 1
+    speakerMap[speaker].words += entry.phrase?.split(/\s+/).filter(Boolean).length || 0
+  })
+
+  const speakerStats = Object.entries(speakerMap).map(([name, stats]) => ({
+    name,
+    phrases: stats.phrases,
+    words: stats.words,
+    percentage: totalPhrases > 0 ? Math.round((stats.phrases / totalPhrases) * 100) : 0,
+  })).sort((a, b) => b.phrases - a.phrases)
+
   const tabs: { id: TabId; label: string; icon: React.ReactNode; disabled?: boolean }[] = [
     {
       id: 'protocol',
@@ -252,6 +274,20 @@ export default function ProtocolPage() {
           )}
         </div>
       </main>
+
+      {/* Hidden print-only document */}
+      {hasSenti && (
+        <PrintProtocol
+          meeting={meeting}
+          transcript={transcript}
+          speakerStats={speakerStats}
+          totalWords={totalWords}
+          totalPhrases={totalPhrases}
+          formatDate={formatDate}
+          formatDuration={formatDuration}
+          formatSec={formatSec}
+        />
+      )}
     </div>
   )
 }
@@ -742,3 +778,242 @@ function Sidebar({ user }: { user: User | null }) {
     </aside>
   )
 }
+
+function PrintProtocol({
+  meeting,
+  transcript,
+  speakerStats,
+  totalWords,
+  totalPhrases,
+  formatDate,
+  formatDuration,
+  formatSec,
+}: {
+  meeting: Meeting
+  transcript: TranscriptEntry[]
+  speakerStats: { name: string; phrases: number; words: number; percentage: number }[]
+  totalWords: number
+  totalPhrases: number
+  formatDate: (iso: string) => string
+  formatDuration: (sec?: number) => string
+  formatSec: (s: number) => string
+}) {
+  const s = meeting.summary
+  if (!s) return null
+
+  const transcriptSpeakers = Array.from(new Set(transcript.map((t) => t.speakerName).filter(Boolean)))
+  const participantNames = meeting.participants && meeting.participants.length > 0
+    ? meeting.participants.map((p) => p.name)
+    : transcriptSpeakers.length > 0
+      ? transcriptSpeakers
+      : ['Неизвестно']
+
+  return (
+    <div className={styles.printOnlyContainer}>
+      {/* Title page / Header */}
+      <div className={styles.printHeader}>
+        <div className={styles.printLogo}>
+          <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
+            <rect x="2" y="10" width="18" height="16" rx="4" fill="#0033A0"/>
+            <path d="M20 14L27 10V26L20 22V14Z" fill="#0033A0"/>
+            <path d="M31 13C32.5 15 32.5 21 31 23" stroke="#0033A0" strokeWidth="2.5" strokeLinecap="round"/>
+          </svg>
+          <span className={styles.printLogoTitle}>Centras.Echo</span>
+        </div>
+        <div className={styles.printDocType}>Официальный протокол встречи</div>
+        <h1 className={styles.printTitle}>{meeting.title}</h1>
+        
+        <div className={styles.printMetaGrid}>
+          <div className={styles.printMetaItem}>
+            <span className={styles.printMetaLabel}>Дата и время</span>
+            <span className={styles.printMetaVal}>{formatDate(meeting.createdAt)}</span>
+          </div>
+          <div className={styles.printMetaItem}>
+            <span className={styles.printMetaLabel}>Длительность</span>
+            <span className={styles.printMetaVal}>{formatDuration(meeting.durationSec)}</span>
+          </div>
+          <div className={styles.printMetaItem}>
+            <span className={styles.printMetaLabel}>Организатор</span>
+            <span className={styles.printMetaVal}>Идентификатор: {meeting.creatorId.substring(0, 8)}</span>
+          </div>
+          <div className={styles.printMetaItem}>
+            <span className={styles.printMetaLabel}>Участников</span>
+            <span className={styles.printMetaVal}>{participantNames.length}</span>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '20px' }}>
+          <span className={styles.printMetaLabel}>Список участников</span>
+          <div className={styles.printParticipantList}>
+            {participantNames.map((name, i) => (
+              <span key={i} className={styles.printParticipantBadge}>{name}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Section: Metrics */}
+      <div className={styles.printSection}>
+        <h2 className={styles.printSectionTitle}>Метрики встречи</h2>
+        <div className={styles.printMetricsGrid}>
+          <div className={styles.printMetricCard}>
+            <div className={styles.printMetricVal}>{participantNames.length}</div>
+            <div className={styles.printMetricLabel}>Участники</div>
+          </div>
+          <div className={styles.printMetricCard}>
+            <div className={styles.printMetricVal}>{formatDuration(meeting.durationSec)}</div>
+            <div className={styles.printMetricLabel}>Длительность</div>
+          </div>
+          <div className={styles.printMetricCard}>
+            <div className={styles.printMetricVal}>{totalPhrases}</div>
+            <div className={styles.printMetricLabel}>Всего фраз</div>
+          </div>
+          <div className={styles.printMetricCard}>
+            <div className={styles.printMetricVal}>{totalWords}</div>
+            <div className={styles.printMetricLabel}>Всего слов</div>
+          </div>
+          <div className={styles.printMetricCard}>
+            <div className={styles.printMetricVal}>{s.decisions.length}</div>
+            <div className={styles.printMetricLabel}>Решения</div>
+          </div>
+          <div className={styles.printMetricCard}>
+            <div className={styles.printMetricVal}>{s.tasks.length}</div>
+            <div className={styles.printMetricLabel}>Задачи</div>
+          </div>
+        </div>
+
+        {speakerStats.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '10px', color: '#121826' }}>
+              Активность участников во встрече
+            </h3>
+            <table className={styles.printTable}>
+              <thead>
+                <tr>
+                  <th>Участник</th>
+                  <th>Сказано фраз</th>
+                  <th>Сказано слов</th>
+                  <th>Доля участия (% фраз)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {speakerStats.map((stat, i) => (
+                  <tr key={i}>
+                    <td>{stat.name}</td>
+                    <td>{stat.phrases}</td>
+                    <td>{stat.words}</td>
+                    <td>{stat.percentage}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Section: Senti Summary */}
+      <div className={styles.printSection}>
+        <h2 className={styles.printSectionTitle}>Резюме встречи</h2>
+        <p className={styles.printSummaryText}>{s.summary}</p>
+      </div>
+
+      {/* Section: Decisions */}
+      <div className={styles.printSection}>
+        <h2 className={styles.printSectionTitle}>Принятые решения ({s.decisions.length})</h2>
+        {s.decisions.length === 0 ? (
+          <p style={{ fontStyle: 'italic', color: '#667085' }}>Решений не зафиксировано</p>
+        ) : (
+          <table className={styles.printTable}>
+            <thead>
+              <tr>
+                <th style={{ width: '15%' }}>Статус</th>
+                <th style={{ width: '25%' }}>Инициатор</th>
+                <th>Текст решения</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.decisions.map((d) => (
+                <tr key={d.id}>
+                  <td>
+                    <span className={`${styles.printDecisionStatus} ${
+                      d.status === 'approved'
+                        ? styles.printDecisionApproved
+                        : d.status === 'rejected'
+                        ? styles.printDecisionRejected
+                        : styles.printDecisionPending
+                    }`}>
+                      {d.status === 'approved' ? 'Принято' : d.status === 'rejected' ? 'Отклонено' : 'Ожидает'}
+                    </span>
+                  </td>
+                  <td>{d.initiator}</td>
+                  <td>{d.text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Section: Tasks */}
+      <div className={styles.printSection}>
+        <h2 className={styles.printSectionTitle}>Задачи и поручения ({s.tasks.length})</h2>
+        {s.tasks.length === 0 ? (
+          <p style={{ fontStyle: 'italic', color: '#667085' }}>Задач не назначено</p>
+        ) : (
+          <table className={styles.printTable}>
+            <thead>
+              <tr>
+                <th style={{ width: '40%' }}>Исполнитель</th>
+                <th style={{ width: '25%' }}>Срок</th>
+                <th>Описание задачи</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.tasks.map((t) => (
+                <tr key={t.id}>
+                  <td><strong>{t.assignee}</strong></td>
+                  <td>{t.deadline || '—'}</td>
+                  <td>{t.text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Section: Key Moments */}
+      {s.keyMoments.length > 0 && (
+        <div className={styles.printSection}>
+          <h2 className={styles.printSectionTitle}>Ключевые моменты</h2>
+          <div className={styles.printKeyMoments}>
+            {s.keyMoments.map((km, i) => (
+              <div key={i} className={styles.printKeyMoment}>
+                <span className={styles.printKeyMomentTime}>{formatSec(km.sec)}</span>
+                <span className={styles.printKeyMomentLabel}>{km.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Section: Transcript */}
+      {transcript.length > 0 && (
+        <div className={styles.printSection} style={{ pageBreakBefore: 'always' }}>
+          <h2 className={styles.printSectionTitle}>Полный транскрипт встречи</h2>
+          <div className={styles.printTranscriptList}>
+            {transcript.map((entry) => (
+              <div key={entry.id} className={styles.printTranscriptEntry}>
+                <span className={styles.printTranscriptTime}>{formatSec(entry.startSec)}</span>
+                <div style={{ flex: 1 }}>
+                  <div className={styles.printTranscriptSpeaker}>{entry.speakerName}</div>
+                  <div className={styles.printTranscriptPhrase}>{entry.phrase}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+

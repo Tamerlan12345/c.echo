@@ -127,10 +127,10 @@ export const meetingsApi = {
   getPublicInfo: (id: string) =>
     apiFetch<{ id: string; title: string; scheduledStart: string | null; isPublic: boolean; creatorName: string }>(`/api/meetings/${id}/public-info`),
 
-  create: (title: string, scheduledStart?: string | null, isPublic?: boolean) =>
+  create: (title: string, scheduledStart?: string | null, isPublic?: boolean, waitingRoomEnabled?: boolean) =>
     apiFetch<Meeting>('/api/meetings', {
       method: 'POST',
-      body: JSON.stringify({ title, scheduledStart, isPublic }),
+      body: JSON.stringify({ title, scheduledStart, isPublic, waitingRoomEnabled }),
     }),
 
   end: (id: string) =>
@@ -153,6 +153,21 @@ export const meetingsApi = {
       body: formData,
     })
   },
+
+  getWaitingStatus: (id: string) =>
+    apiFetch<{ status: 'admitted' | 'pending' | 'rejected' | 'none' }>(`/api/meetings/${id}/waiting-room/status`),
+
+  joinWaitingRoom: (id: string) =>
+    apiFetch<{ status: 'admitted' | 'pending' }>(`/api/meetings/${id}/waiting-room/join`, { method: 'POST' }),
+
+  getWaitingList: (id: string) =>
+    apiFetch<Array<{ userId: string; name: string; email: string; avatarUrl: string | null }>>(`/api/meetings/${id}/waiting-room`),
+
+  admitUser: (id: string, userId: string) =>
+    apiFetch<{ admitted: boolean }>(`/api/meetings/${id}/waiting-room/${userId}/admit`, { method: 'POST' }),
+
+  rejectUser: (id: string, userId: string) =>
+    apiFetch<{ rejected: boolean }>(`/api/meetings/${id}/waiting-room/${userId}/reject`, { method: 'POST' }),
 }
 
 // ─── Consent ──────────────────────────────────────────────────────────────────
