@@ -3,39 +3,39 @@
 /* ─── Design Tokens ─────────────────────────────────────────────────────────── */
 :root {
   /* Colors */
-  --color-bg-primary:    #F5F7FA;
-  --color-bg-surface:    #FFFFFF;
-  --color-bg-surface-2:  #EEF2F6;
-  --color-bg-glass:      rgba(255, 255, 255, 0.82);
-  --color-border:        #D9E0EA;
-  --color-border-hover:  #AEBBCC;
+  --color-bg-primary:    #0A0F1D;
+  --color-bg-surface:    #111827;
+  --color-bg-surface-2:  #1F2937;
+  --color-bg-glass:      rgba(17, 24, 39, 0.75);
+  --color-border:        rgba(255, 255, 255, 0.08);
+  --color-border-hover:  rgba(255, 255, 255, 0.15);
 
   /* Accent */
-  --color-accent-blue:   #0033A0;
-  --color-accent-blue-dim: rgba(0, 51, 160, 0.10);
+  --color-accent-blue:   #60A5FA;
+  --color-accent-blue-dim: rgba(96, 165, 250, 0.12);
   --color-accent-amber:  #E50012;
-  --color-accent-amber-dim: rgba(229, 0, 18, 0.10);
-  --color-accent-deep:   #8A005A;
-  --color-accent-deep-dim: rgba(138, 0, 90, 0.10);
+  --color-accent-amber-dim: rgba(229, 0, 18, 0.15);
+  --color-accent-deep:   #EC4899;
+  --color-accent-deep-dim: rgba(236, 72, 153, 0.12);
 
   /* Text */
-  --color-text-primary:  #121826;
-  --color-text-secondary: #344054;
-  --color-text-muted:    #667085;
-  --color-text-disabled: #98A2B3;
+  --color-text-primary:  #F8FAFC;
+  --color-text-secondary: #E2E8F0;
+  --color-text-muted:    #94A3B8;
+  --color-text-disabled: #475569;
 
   /* Status */
-  --color-success:       #0F9F6E;
-  --color-success-dim:   rgba(15, 159, 110, 0.11);
-  --color-danger:        #D92D20;
-  --color-danger-dim:    rgba(217, 45, 32, 0.11);
-  --color-warning:       #B76E00;
+  --color-success:       #10B981;
+  --color-success-dim:   rgba(16, 185, 129, 0.12);
+  --color-danger:        #EF4444;
+  --color-danger-dim:    rgba(239, 68, 68, 0.12);
+  --color-warning:       #F59E0B;
 
   /* Gradients */
-  --gradient-accent:     linear-gradient(135deg, #0033A0 0%, #0B4CC4 100%);
-  --gradient-amber:      linear-gradient(135deg, #E50012 0%, #BA0010 100%);
-  --gradient-surface:    linear-gradient(180deg, #FFFFFF 0%, #F7F9FC 100%);
-  --gradient-ambient:    linear-gradient(180deg, #F8FAFC 0%, #EEF3F8 100%);
+  --gradient-accent:     linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  --gradient-amber:      linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
+  --gradient-surface:    linear-gradient(180deg, #111827 0%, #0F172A 100%);
+  --gradient-ambient:    linear-gradient(135deg, #0A0F1D 0%, #070A13 100%);
 
   /* Typography */
   --font-primary:        'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -124,10 +124,10 @@ code, pre {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #C8D1DD;
+  background: #374151;
   border-radius: var(--radius-full);
 }
-::-webkit-scrollbar-thumb:hover { background: #9EAABD; }
+::-webkit-scrollbar-thumb:hover { background: #4B5563; }
 
 /* ─── Utility Classes ────────────────────────────────────────────────────────── */
 
