@@ -168,6 +168,18 @@ export const meetingsApi = {
 
   rejectUser: (id: string, userId: string) =>
     apiFetch<{ rejected: boolean }>(`/api/meetings/${id}/waiting-room/${userId}/reject`, { method: 'POST' }),
+
+  setMuteOnEntry: (id: string, enabled: boolean) =>
+    apiFetch<{ muteOnEntry: boolean }>(`/api/meetings/${id}/mute-on-entry`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
+
+  transferHost: (id: string, newHostId: string) =>
+    apiFetch<{ hostId: string }>(`/api/meetings/${id}/transfer-host`, {
+      method: 'POST',
+      body: JSON.stringify({ newHostId }),
+    }),
 }
 
 // ─── Consent ──────────────────────────────────────────────────────────────────

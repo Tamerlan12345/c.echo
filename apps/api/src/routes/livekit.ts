@@ -70,7 +70,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
 
     // Load meeting
     const meetingResult = await pool.query(
-      'SELECT id, livekit_room, ended_at, creator_id, waiting_room_enabled FROM meetings WHERE id = $1',
+      'SELECT id, livekit_room, ended_at, creator_id, COALESCE(host_id, creator_id) AS host_id, waiting_room_enabled FROM meetings WHERE id = $1',
       [meetingId],
     )
     const meeting = meetingResult.rows[0]
@@ -82,7 +82,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Enforce waiting room check for non-hosts
-    if (meeting.waiting_room_enabled && meeting.creator_id !== user.sub) {
+    if (meeting.waiting_room_enabled && meeting.host_id !== user.sub) {
       const waitResult = await pool.query(
         'SELECT status FROM meeting_waiting_room WHERE meeting_id = $1 AND user_id = $2',
         [meetingId, user.sub]
@@ -153,13 +153,13 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
 
     // Check host
     const meeting = await pool.query(
-      'SELECT creator_id, livekit_room, is_recorded FROM meetings WHERE id = $1',
+      'SELECT COALESCE(host_id, creator_id) AS host_id, livekit_room, is_recorded FROM meetings WHERE id = $1',
       [meetingId],
     )
     if (!meeting.rows[0]) {
       return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
     }
-    if (meeting.rows[0].creator_id !== user.sub) {
+    if (meeting.rows[0].host_id !== user.sub) {
       return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only host can start recording' } })
     }
     if (meeting.rows[0].is_recorded) {
@@ -210,13 +210,13 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     const { meetingId } = request.body as { meetingId: string }
 
     const meeting = await pool.query(
-      'SELECT creator_id FROM meetings WHERE id = $1',
+      'SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1',
       [meetingId],
     )
     if (!meeting.rows[0]) {
       return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
     }
-    if (meeting.rows[0].creator_id !== user.sub) {
+    if (meeting.rows[0].host_id !== user.sub) {
       return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only host can stop recording' } })
     }
 

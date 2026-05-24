@@ -70,12 +70,15 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
 
       const result = await pool.query(
         `SELECT
-           m.id, m.title, m.creator_id AS "creatorId", m.livekit_room AS "livekitRoom",
+           m.id, m.title, m.creator_id AS "creatorId",
+           COALESCE(m.host_id, m.creator_id) AS "hostId",
+           m.livekit_room AS "livekitRoom",
            m.created_at AS "createdAt", m.ended_at AS "endedAt",
            m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
            m.senti_status AS "sentiStatus", m.summary,
            m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
            m.waiting_room_enabled AS "waitingRoomEnabled",
+           m.mute_on_entry AS "muteOnEntry",
            json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
            (
              SELECT json_agg(json_build_object(
@@ -108,9 +111,9 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const { title, scheduledStart, isPublic, waitingRoomEnabled } = body.data
       const roomName = `centras-${randomUUID()}`
       const result = await pool.query(
-        `INSERT INTO meetings (title, creator_id, livekit_room, scheduled_start, is_public, waiting_room_enabled)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, title, creator_id AS "creatorId", livekit_room AS "livekitRoom", created_at AS "createdAt", scheduled_start AS "scheduledStart", is_public AS "isPublic", waiting_room_enabled AS "waitingRoomEnabled", is_recorded AS "isRecorded", senti_status AS "sentiStatus"`,
+        `INSERT INTO meetings (title, creator_id, host_id, livekit_room, scheduled_start, is_public, waiting_room_enabled)
+         VALUES ($1, $2, $2, $3, $4, $5, $6)
+         RETURNING id, title, creator_id AS "creatorId", host_id AS "hostId", livekit_room AS "livekitRoom", created_at AS "createdAt", scheduled_start AS "scheduledStart", is_public AS "isPublic", waiting_room_enabled AS "waitingRoomEnabled", is_recorded AS "isRecorded", senti_status AS "sentiStatus"`,
         [title, user.sub, roomName, scheduledStart ? new Date(scheduledStart) : null, isPublic ?? false, waitingRoomEnabled ?? false],
       )
 
@@ -146,12 +149,15 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
 
       const result = await pool.query(
         `SELECT
-           m.id, m.title, m.creator_id AS "creatorId", m.livekit_room AS "livekitRoom",
+           m.id, m.title, m.creator_id AS "creatorId",
+           COALESCE(m.host_id, m.creator_id) AS "hostId",
+           m.livekit_room AS "livekitRoom",
            m.created_at AS "createdAt", m.ended_at AS "endedAt",
            m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
            m.senti_status AS "sentiStatus", m.summary,
            m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
            m.waiting_room_enabled AS "waitingRoomEnabled",
+           m.mute_on_entry AS "muteOnEntry",
            json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
            (
              SELECT json_agg(json_build_object(
@@ -190,6 +196,63 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       )
 
       return reply.send({ data: { joined: true } })
+    })
+
+    // PATCH /api/meetings/:id/mute-on-entry — host-only toggle for "new joiners muted"
+    app.patch('/:id/mute-on-entry', async (request, reply) => {
+      const user = request.user as { sub: string }
+      const { id } = request.params as { id: string }
+      const body = request.body as { enabled?: boolean }
+      if (typeof body?.enabled !== 'boolean') {
+        return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: 'enabled (boolean) is required' } })
+      }
+
+      const meeting = await pool.query('SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1', [id])
+      if (!meeting.rows[0]) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+      if (meeting.rows[0].host_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Host only' } })
+      }
+
+      await pool.query('UPDATE meetings SET mute_on_entry = $1 WHERE id = $2', [body.enabled, id])
+      return reply.send({ data: { muteOnEntry: body.enabled } })
+    })
+
+    // POST /api/meetings/:id/transfer-host — current host transfers the role to another participant
+    app.post('/:id/transfer-host', async (request, reply) => {
+      const user = request.user as { sub: string }
+      const { id } = request.params as { id: string }
+      const body = request.body as { newHostId?: string }
+      if (!body?.newHostId || typeof body.newHostId !== 'string') {
+        return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: 'newHostId is required' } })
+      }
+      if (body.newHostId === user.sub) {
+        return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: 'Already host' } })
+      }
+
+      const meeting = await pool.query(
+        'SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1 AND ended_at IS NULL',
+        [id],
+      )
+      if (!meeting.rows[0]) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Active meeting not found' } })
+      }
+      if (meeting.rows[0].host_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the current host can transfer the role' } })
+      }
+
+      // New host must be a current participant of the meeting.
+      const participant = await pool.query(
+        'SELECT 1 FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
+        [id, body.newHostId],
+      )
+      if (!participant.rows[0]) {
+        return reply.status(400).send({ error: { code: 'NOT_PARTICIPANT', message: 'New host must already be a participant' } })
+      }
+
+      await pool.query('UPDATE meetings SET host_id = $1 WHERE id = $2', [body.newHostId, id])
+      return reply.send({ data: { hostId: body.newHostId } })
     })
 
     // POST /api/meetings/:id/end — host or participant ends the meeting
@@ -331,7 +394,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const { id } = request.params as { id: string }
 
       const meetingRes = await pool.query(
-        'SELECT creator_id, waiting_room_enabled FROM meetings WHERE id = $1',
+        'SELECT COALESCE(host_id, creator_id) AS host_id, waiting_room_enabled FROM meetings WHERE id = $1',
         [id]
       )
       const meeting = meetingRes.rows[0]
@@ -339,7 +402,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
       }
 
-      if (meeting.creator_id === user.sub || !meeting.waiting_room_enabled) {
+      if (meeting.host_id === user.sub || !meeting.waiting_room_enabled) {
         return reply.send({ data: { status: 'admitted' } })
       }
 
@@ -367,12 +430,12 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const user = request.user as { sub: string }
       const { id } = request.params as { id: string }
 
-      const meetingRes = await pool.query('SELECT creator_id, waiting_room_enabled FROM meetings WHERE id = $1', [id])
+      const meetingRes = await pool.query('SELECT COALESCE(host_id, creator_id) AS host_id, waiting_room_enabled FROM meetings WHERE id = $1', [id])
       if (!meetingRes.rows[0]) {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
       }
 
-      if (!meetingRes.rows[0].waiting_room_enabled || meetingRes.rows[0].creator_id === user.sub) {
+      if (!meetingRes.rows[0].waiting_room_enabled || meetingRes.rows[0].host_id === user.sub) {
         await pool.query(
           'INSERT INTO meeting_participants (meeting_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
           [id, user.sub]
@@ -394,13 +457,13 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const user = request.user as { sub: string }
       const { id } = request.params as { id: string }
 
-      const meetingRes = await pool.query('SELECT creator_id FROM meetings WHERE id = $1', [id])
+      const meetingRes = await pool.query('SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1', [id])
       if (!meetingRes.rows[0]) {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
       }
 
-      if (meetingRes.rows[0].creator_id !== user.sub) {
-        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only creator can view waiting room' } })
+      if (meetingRes.rows[0].host_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the host can view the waiting room' } })
       }
 
       const result = await pool.query(
@@ -420,13 +483,13 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const user = request.user as { sub: string }
       const { id, userId } = request.params as { id: string; userId: string }
 
-      const meetingRes = await pool.query('SELECT creator_id FROM meetings WHERE id = $1', [id])
+      const meetingRes = await pool.query('SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1', [id])
       if (!meetingRes.rows[0]) {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
       }
 
-      if (meetingRes.rows[0].creator_id !== user.sub) {
-        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only creator can admit users' } })
+      if (meetingRes.rows[0].host_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the host can admit users' } })
       }
 
       await pool.query(
@@ -446,13 +509,13 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const user = request.user as { sub: string }
       const { id, userId } = request.params as { id: string; userId: string }
 
-      const meetingRes = await pool.query('SELECT creator_id FROM meetings WHERE id = $1', [id])
+      const meetingRes = await pool.query('SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1', [id])
       if (!meetingRes.rows[0]) {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
       }
 
-      if (meetingRes.rows[0].creator_id !== user.sub) {
-        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only creator can reject users' } })
+      if (meetingRes.rows[0].host_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the host can reject users' } })
       }
 
       await pool.query(

@@ -25,6 +25,7 @@ export interface Meeting {
   id: string
   title: string
   creatorId: string
+  hostId?: string
   livekitRoom: string
   createdAt: string
   endedAt?: string
@@ -36,6 +37,7 @@ export interface Meeting {
   scheduledStart?: string | null
   isPublic?: boolean
   waitingRoomEnabled?: boolean
+  muteOnEntry?: boolean
 }
 
 export interface MeetingParticipant {

@@ -174,3 +174,12 @@ CREATE POLICY waiting_room_access ON meeting_waiting_room
     FOR ALL
     USING (true);
 
+-- ─── Host moderation ──────────────────────────────────────────────────────────
+
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS mute_on_entry BOOLEAN DEFAULT FALSE;
+
+-- Current host (can be transferred). Defaults to creator on insert; backfilled below.
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS host_id UUID REFERENCES users(id) ON DELETE SET NULL;
+UPDATE meetings SET host_id = creator_id WHERE host_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_meetings_host ON meetings(host_id);
+

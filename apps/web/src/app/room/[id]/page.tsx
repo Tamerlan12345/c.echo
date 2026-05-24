@@ -18,7 +18,8 @@ import {
   Mic, MicOff, Video, VideoOff, Monitor, Users,
   PhoneOff, Bot, Shield, CheckCircle2, XCircle,
   Circle, StopCircle, X, LogOut, MessageSquare, Send,
-  Globe, Copy, Check, Calendar, Lock, Hand, Smile, VolumeX
+  Globe, Copy, Check, Calendar, Lock, Hand, Smile, VolumeX,
+  LayoutGrid, User as UserIcon
 } from 'lucide-react'
 import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
@@ -177,6 +178,11 @@ export default function RoomPage() {
     setServerUrl(tokenRes.data.serverUrl)
     setShowWelcome(false)
     setIsInWaitingRoom(false)
+
+    // Apply mute-on-entry: non-host joiners start with mic off.
+    if (meetRes.data.muteOnEntry && meetRes.data.creatorId !== meRes.data.id) {
+      setInitialMicEnabled(false)
+    }
   }, [id, publicInfo])
 
   useEffect(() => {
@@ -540,6 +546,41 @@ export default function RoomPage() {
   )
 }
 
+// ─── Speaker view (one big tile + thumbnail strip) ────────────────────────────
+
+function SpeakerView({ tracks }: { tracks: ReturnType<typeof useTracks> }) {
+  // Pick the focus track: prefer a ScreenShare, otherwise the active speaker, otherwise the first remote camera, otherwise any.
+  const screenShare = tracks.find((t) => t.source === Track.Source.ScreenShare)
+  const speakingCam = tracks.find(
+    (t) => t.source === Track.Source.Camera && (t.participant as any)?.isSpeaking && !t.participant.isLocal,
+  )
+  const remoteCam = tracks.find((t) => t.source === Track.Source.Camera && !t.participant.isLocal)
+  const focus = screenShare ?? speakingCam ?? remoteCam ?? tracks[0]
+
+  const others = tracks.filter((t) => t !== focus && t.source === Track.Source.Camera)
+
+  if (!focus) {
+    return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' }}>Нет видео-потоков</div>
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 8 }}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        <ParticipantTile trackRef={focus} style={{ width: '100%', height: '100%' }} />
+      </div>
+      {others.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, height: 120, flexShrink: 0, overflowX: 'auto', paddingBottom: 4 }}>
+          {others.map((t) => (
+            <div key={`${t.participant.identity}-${t.source}`} style={{ width: 180, height: '100%', flexShrink: 0, borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+              <ParticipantTile trackRef={t} style={{ width: '100%', height: '100%' }} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Pre-join screen (device pick + preview before LiveKit connect) ───────────
 
 interface PreJoinScreenProps {
@@ -820,7 +861,10 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   const { localParticipant } = useLocalParticipant()
   const allParticipants = localParticipant ? [localParticipant, ...remoteParticipants] : remoteParticipants
 
-  const isHost = meeting.creatorId === user.id
+  // Current host can change at runtime via transfer-host. Keep it as state so all
+  // UI gates (isHost, "Организатор" badge, host-only buttons) update reactively.
+  const [currentHostId, setCurrentHostId] = useState<string>(meeting.hostId ?? meeting.creatorId)
+  const isHost = currentHostId === user.id
 
   // LiveKit participant.identity === user.id (set in /api/livekit token route).
   const connectedIdentities = new Set(allParticipants.map((p) => p.identity))
@@ -876,6 +920,9 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   const [raisedHands, setRaisedHands] = useState<Record<string, boolean>>({})
   const [floatingReactions, setFloatingReactions] = useState<Array<{ id: string; identity: string; emoji: string }>>([])
   const [showReactionsMenu, setShowReactionsMenu] = useState(false)
+
+  // Video layout
+  const [viewMode, setViewMode] = useState<'gallery' | 'speaker'>('gallery')
 
   // Waiting Room state for host
   const [waitingUsers, setWaitingUsers] = useState<any[]>([])
@@ -995,6 +1042,17 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
             localParticipant.setMicrophoneEnabled(false)
             setMicEnabled(false)
           }
+        } else if (data.type === 'mute_all') {
+          // Host requested everyone to mute. Host's own mic is unaffected (they send, not receive their own data).
+          if (localParticipant && participant?.identity !== localParticipant.identity) {
+            localParticipant.setMicrophoneEnabled(false)
+            setMicEnabled(false)
+          }
+        } else if (data.type === 'host_changed') {
+          // Host transfer broadcast — sync local host state for all clients.
+          if (typeof data.newHostId === 'string') {
+            setCurrentHostId(data.newHostId)
+          }
         } else if (data.type === 'recording_started') {
           setIsRecording(true)
         } else if (data.type === 'recording_stopped') {
@@ -1048,6 +1106,53 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     } catch (err) {
       console.error('Failed to broadcast mute participant signal:', err)
     }
+  }
+
+  const handleMuteAll = async () => {
+    if (!localParticipant || !isHost) return
+    try {
+      const encoder = new TextEncoder()
+      const data = encoder.encode(JSON.stringify({ type: 'mute_all' }))
+      await localParticipant.publishData(data, { reliable: true })
+    } catch (err) {
+      console.error('Failed to broadcast mute_all signal:', err)
+    }
+  }
+
+  // Mute-on-entry toggle (host only). Local meeting state mirrors the server.
+  const [muteOnEntry, setMuteOnEntry] = useState<boolean>(meeting.muteOnEntry ?? false)
+  const handleToggleMuteOnEntry = async () => {
+    if (!isHost) return
+    const next = !muteOnEntry
+    setMuteOnEntry(next)
+    const res = await meetingsApi.setMuteOnEntry(meetingId, next)
+    if ('error' in res) {
+      setMuteOnEntry(!next) // revert
+    }
+  }
+
+  // Transfer-host: confirmation modal + API + DataChannel broadcast.
+  const [transferTarget, setTransferTarget] = useState<{ identity: string; name: string } | null>(null)
+
+  const handleTransferHost = async () => {
+    if (!isHost || !transferTarget || !localParticipant) return
+    const newHostId = transferTarget.identity
+    const res = await meetingsApi.transferHost(meetingId, newHostId)
+    if ('data' in res && res.data) {
+      // Update locally — we're no longer host as of now.
+      setCurrentHostId(newHostId)
+      // Notify all other participants so their UI flips too.
+      try {
+        const encoder = new TextEncoder()
+        const data = encoder.encode(JSON.stringify({ type: 'host_changed', newHostId }))
+        await localParticipant.publishData(data, { reliable: true })
+      } catch (err) {
+        console.error('Failed to broadcast host_changed:', err)
+      }
+    } else {
+      alert((res as any).error?.message ?? 'Не удалось передать роль организатора')
+    }
+    setTransferTarget(null)
   }
 
   // Waiting Room Host Actions
@@ -1485,7 +1590,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                     {displayName}
                     {p.isLocal && ' (вы)'}
                   </div>
-                  {p.identity === meeting.creatorId && (
+                  {p.identity === currentHostId && (
                     <div className={styles.participantRole}>Организатор</div>
                   )}
                 </div>
@@ -1494,6 +1599,16 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                     <span className={styles.raisedHandSidebarBadge} title="Поднята рука">✋</span>
                   )}
                   <ConnectionQualityBar participant={p} />
+                  {isHost && !p.isLocal && p.identity !== currentHostId && (
+                    <button
+                      className={styles.muteActionBtn}
+                      onClick={() => setTransferTarget({ identity: p.identity, name: p.name ?? p.identity })}
+                      title="Передать роль организатора"
+                      aria-label={`Передать роль организатора ${p.name ?? p.identity}`}
+                    >
+                      <Shield size={14} />
+                    </button>
+                  )}
                   {isMuted ? (
                     <MicOff size={14} className={styles.mutedIcon} />
                   ) : (
@@ -1548,9 +1663,13 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
         {/* LiveKit video grid */}
         <div className={styles.videoGrid}>
-          <GridLayout tracks={tracks} style={{ height: '100%' }}>
-            <ParticipantTile />
-          </GridLayout>
+          {viewMode === 'gallery' ? (
+            <GridLayout tracks={tracks} style={{ height: '100%' }}>
+              <ParticipantTile />
+            </GridLayout>
+          ) : (
+            <SpeakerView tracks={tracks} />
+          )}
 
           {/* Floating reactions layer */}
           <div className={styles.reactionsLayer}>
@@ -1569,7 +1688,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
         {/* Controls */}
         <div className={styles.controlsBar}>
-          {/* Left: participants + layout */}
+          {/* Left: participants + layout + host moderation */}
           <div className={styles.controlsLeft}>
             <Tooltip label={showParticipants ? 'Скрыть участников' : 'Показать участников'}>
               <button
@@ -1581,6 +1700,43 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                 <Users size={20} />
               </button>
             </Tooltip>
+
+            <Tooltip label={viewMode === 'gallery' ? 'Вид: активный докладчик' : 'Вид: сетка'}>
+              <button
+                id="toggle-view-mode-btn"
+                className={`${styles.controlBtn} ${viewMode === 'speaker' ? styles.active : ''}`}
+                onClick={() => setViewMode((v) => (v === 'gallery' ? 'speaker' : 'gallery'))}
+                aria-label="Переключить вид"
+              >
+                {viewMode === 'gallery' ? <UserIcon size={20} /> : <LayoutGrid size={20} />}
+              </button>
+            </Tooltip>
+
+            {isHost && (
+              <>
+                <Tooltip label="Выключить микрофоны у всех">
+                  <button
+                    id="mute-all-btn"
+                    className={styles.controlBtn}
+                    onClick={handleMuteAll}
+                    aria-label="Выключить микрофоны у всех"
+                  >
+                    <MicOff size={20} />
+                  </button>
+                </Tooltip>
+
+                <Tooltip label={muteOnEntry ? 'Новые входят со включённым мик.' : 'Новые входят с выключенным мик.'}>
+                  <button
+                    id="mute-on-entry-btn"
+                    className={`${styles.controlBtn} ${muteOnEntry ? styles.active : ''}`}
+                    onClick={handleToggleMuteOnEntry}
+                    aria-label="Выключать микрофон при входе"
+                  >
+                    <Lock size={20} />
+                  </button>
+                </Tooltip>
+              </>
+            )}
           </div>
 
           {/* Center: mic, cam, screen, hand, reactions, noise suppression, end */}
@@ -2050,6 +2206,39 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
               </div>
               <button className="btn btn-ghost" style={{ marginTop: 'var(--space-2)', width: '100%' }} onClick={() => setShowEndConfirm(false)}>
                 Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transfer Host Confirm ── */}
+      {transferTarget && (
+        <div className="modal-overlay" onClick={() => setTransferTarget(null)}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 420, padding: 'var(--space-6)', textAlign: 'center' }}
+          >
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: 'var(--color-accent-amber-dim, rgba(245, 158, 11, 0.15))',
+              color: 'var(--color-accent-amber, #f59e0b)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto var(--space-4)',
+            }}>
+              <Shield size={22} />
+            </div>
+            <h3 style={{ marginBottom: 'var(--space-2)' }}>Передать роль организатора?</h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: 'var(--space-6)', lineHeight: 1.5 }}>
+              <strong>{transferTarget.name}</strong> станет организатором: сможет одобрять участников из зала ожидания, выключать микрофоны, запускать запись и передавать роль дальше. Вы потеряете эти права.
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setTransferTarget(null)}>
+                Отмена
+              </button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleTransferHost}>
+                Передать
               </button>
             </div>
           </div>
