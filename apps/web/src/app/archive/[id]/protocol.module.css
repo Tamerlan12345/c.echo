@@ -562,8 +562,309 @@
   display: none;
 }
 
+/* Page styles for pagination preview */
+.pdfPage {
+  width: 794px;
+  height: 1123px;
+  padding: 50px 60px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  position: relative;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #0F172A;
+}
+
+.printHeader {
+  border-bottom: 2px solid #2563EB;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.printLogo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.printLogoTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1E3A8A;
+  letter-spacing: -0.02em;
+}
+
+.printDocType {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #2563EB;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.printTitle {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 6px 0 16px 0;
+  line-height: 1.2;
+}
+
+.printMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  border-top: 1px solid #E2E8F0;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 14px 0;
+  margin-top: 16px;
+  width: 100%;
+}
+
+.printMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.printMetaLabel {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.625rem;
+  color: #64748B;
+  letter-spacing: 0.05em;
+}
+
+.printMetaVal {
+  color: #1E293B;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.printParticipantList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.printParticipantBadge {
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.printSection {
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.printSectionTitle {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #1E3A8A;
+  border-left: 3px solid #2563EB;
+  padding-left: 8px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.printSummaryText {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #334155;
+  text-align: justify;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 0;
+}
+
+.printMetricsGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.printMetricCard {
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 8px 4px;
+  text-align: center;
+  background: #F8FAFC;
+}
+
+.printMetricVal {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #2563EB;
+}
+
+.printMetricLabel {
+  font-size: 0.5625rem;
+  color: #64748B;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.printTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4px;
+  font-size: 0.75rem;
+}
+
+.printTable th {
+  background: #F1F5F9;
+  color: #1E293B;
+  text-align: left;
+  padding: 6px 10px;
+  font-weight: 700;
+  border: 1px solid #E2E8F0;
+}
+
+.printTable td {
+  padding: 6px 10px;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+}
+
+.printTable tr:nth-child(even) {
+  background: #F8FAFC;
+}
+
+.printDecisionStatus {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.printDecisionApproved {
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+}
+
+.printDecisionRejected {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+.printDecisionPending {
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+}
+
+.printProgressBarContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.printProgressBar {
+  flex: 1;
+  height: 6px;
+  background: #E2E8F0;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.printProgressBarFill {
+  height: 100%;
+  background: #2563EB;
+  border-radius: 9999px;
+}
+
+.printProgressVal {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #475569;
+  width: 28px;
+  text-align: right;
+}
+
+.printKeyMoments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.printKeyMoment {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  border-bottom: 1px dashed #E2E8F0;
+  padding-bottom: 4px;
+}
+
+.printKeyMomentTime {
+  font-family: monospace;
+  font-weight: 700;
+  color: #2563EB;
+  min-width: 40px;
+}
+
+.printKeyMomentLabel {
+  color: #334155;
+}
+
+.printTranscriptList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.printTranscriptEntry {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #F1F5F9;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.printTranscriptTime {
+  font-family: monospace;
+  color: #2563EB;
+  font-weight: 600;
+  min-width: 40px;
+  flex-shrink: 0;
+}
+
+.printTranscriptSpeaker {
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 1px;
+}
+
+.printTranscriptPhrase {
+  color: #334155;
+}
+
+/* Native @media print overrides for browser dialog */
 @media print {
-  /* Hide the screen layout and elements completely */
   .layout,
   .sidebar,
   .main,
@@ -576,259 +877,8 @@
   .printOnlyContainer {
     display: block !important;
     background: #ffffff !important;
-    color: #121826 !important;
-    font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    color: #0F172A !important;
     padding: 0 !important;
     margin: 0 !important;
-  }
-
-  .printHeader {
-    border-bottom: 2px solid #0033A0;
-    padding-bottom: 20px;
-    margin-bottom: 30px;
-  }
-
-  .printLogo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
-  .printLogoTitle {
-    font-size: 1.375rem;
-    font-weight: 800;
-    color: #0033A0;
-  }
-
-  .printDocType {
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: #8A005A;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 8px;
-  }
-
-  .printTitle {
-    font-size: 2rem;
-    font-weight: 800;
-    color: #121826;
-    margin: 8px 0;
-    line-height: 1.25;
-  }
-
-  .printMetaGrid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-top: 20px;
-  }
-
-  .printMetaItem {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .printMetaLabel {
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.6875rem;
-    color: #667085;
-    letter-spacing: 0.02em;
-  }
-
-  .printMetaVal {
-    color: #121826;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .printParticipantList {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
-  }
-
-  .printParticipantBadge {
-    background: #EEF2F6 !important;
-    border: 1px solid #D9E0EA !important;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.8125rem;
-    color: #344054;
-    font-weight: 500;
-  }
-
-  .printSection {
-    margin-bottom: 32px;
-    page-break-inside: avoid;
-  }
-
-  .printSectionTitle {
-    font-size: 1.125rem;
-    font-weight: 800;
-    color: #0033A0;
-    border-bottom: 2px solid #EEF2F6;
-    padding-bottom: 6px;
-    margin-bottom: 16px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .printSummaryText {
-    font-size: 0.875rem;
-    line-height: 1.6;
-    color: #344054;
-    text-align: justify;
-  }
-
-  .printMetricsGrid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
-  }
-
-  .printMetricCard {
-    border: 1px solid #D9E0EA;
-    border-radius: 6px;
-    padding: 10px 6px;
-    text-align: center;
-    background: #F8FAFC !important;
-    page-break-inside: avoid;
-  }
-
-  .printMetricVal {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #0033A0;
-  }
-
-  .printMetricLabel {
-    font-size: 0.625rem;
-    color: #667085;
-    text-transform: uppercase;
-    font-weight: 600;
-    margin-top: 4px;
-  }
-
-  .printTable {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 8px;
-    font-size: 0.8125rem;
-  }
-
-  .printTable th {
-    background: #EEF2F6 !important;
-    color: #121826;
-    text-align: left;
-    padding: 6px 10px;
-    font-weight: 700;
-    border: 1px solid #D9E0EA;
-  }
-
-  .printTable td {
-    padding: 6px 10px;
-    border: 1px solid #D9E0EA;
-    color: #344054;
-  }
-
-  .printTable tr:nth-child(even) {
-    background: #F8FAFC !important;
-  }
-
-  .printDecisionStatus {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-
-  .printDecisionApproved {
-    background: rgba(15, 159, 110, 0.1) !important;
-    color: #0F9F6E !important;
-    border: 1px solid rgba(15, 159, 110, 0.2) !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .printDecisionRejected {
-    background: rgba(217, 45, 32, 0.1) !important;
-    color: #D92D20 !important;
-    border: 1px solid rgba(217, 45, 32, 0.2) !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .printDecisionPending {
-    background: rgba(102, 112, 133, 0.1) !important;
-    color: #667085 !important;
-    border: 1px solid rgba(102, 112, 133, 0.2) !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .printKeyMoments {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .printKeyMoment {
-    display: flex;
-    gap: 12px;
-    font-size: 0.8125rem;
-    border-bottom: 1px dashed #E2E8F0;
-    padding-bottom: 4px;
-    page-break-inside: avoid;
-  }
-
-  .printKeyMomentTime {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    color: #8A005A;
-    min-width: 44px;
-  }
-
-  .printKeyMomentLabel {
-    color: #344054;
-  }
-
-  .printTranscriptList {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .printTranscriptEntry {
-    display: flex;
-    gap: 12px;
-    font-size: 0.8125rem;
-    page-break-inside: avoid;
-    line-height: 1.5;
-  }
-
-  .printTranscriptTime {
-    font-family: 'JetBrains Mono', monospace;
-    color: #0033A0;
-    font-weight: 600;
-    min-width: 44px;
-    flex-shrink: 0;
-  }
-
-  .printTranscriptSpeaker {
-    font-weight: 700;
-    color: #121826;
-    margin-bottom: 1px;
-  }
-
-  .printTranscriptPhrase {
-    color: #344054;
   }
 }

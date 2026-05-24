@@ -190,56 +190,115 @@ export default function ProtocolPage() {
       const { jsPDF } = await import('jspdf')
       const html2canvas = (await import('html2canvas')).default
 
-      const element = document.querySelector(`.${styles.printOnlyContainer}`) as HTMLElement
-      if (!element) {
+      const sourceElement = document.querySelector(`.${styles.printOnlyContainer}`) as HTMLElement
+      if (!sourceElement) {
         throw new Error('Печатная форма не найдена')
       }
 
-      // Temporarily override display to render the print container
-      const originalDisplay = element.style.display
-      element.style.setProperty('display', 'block', 'important')
-      element.style.position = 'absolute'
-      element.style.left = '-9999px'
-      element.style.top = '0'
-      element.style.width = '800px'
+      // Temporarily display the source to clone nodes
+      const originalDisplay = sourceElement.style.display
+      sourceElement.style.setProperty('display', 'block', 'important')
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      })
+      // Create temporary container for layout
+      const tempContainer = document.createElement('div')
+      tempContainer.style.position = 'absolute'
+      tempContainer.style.left = '-9999px'
+      tempContainer.style.top = '0'
+      tempContainer.style.width = '794px'
+      tempContainer.style.background = '#ffffff'
+      document.body.appendChild(tempContainer)
 
-      element.style.display = originalDisplay
-      element.style.position = ''
-      element.style.left = ''
-      element.style.top = ''
-      element.style.width = ''
+      const createNewPage = () => {
+        const page = document.createElement('div')
+        page.className = styles.pdfPage
+        page.style.width = '794px'
+        page.style.height = '1123px'
+        page.style.padding = '50px 60px'
+        page.style.boxSizing = 'border-box'
+        page.style.display = 'flex'
+        page.style.flexDirection = 'column'
+        page.style.background = '#ffffff'
+        page.style.position = 'relative'
+        return page
+      }
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      const pages: HTMLElement[] = []
+      let currentPage = createNewPage()
+      tempContainer.appendChild(currentPage)
+      pages.push(currentPage)
+
+      // Get all blocks with class 'pdf-section'
+      const blocks = sourceElement.querySelectorAll('.pdf-section')
+      const MAX_PAGE_CONTENT_HEIGHT = 970 // usable page content height leaving room for footer
+
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i].cloneNode(true) as HTMLElement
+        currentPage.appendChild(block)
+
+        // Calculate height including margins
+        let currentHeight = 0
+        const children = Array.from(currentPage.children)
+        for (let j = 0; j < children.length; j++) {
+          const child = children[j] as HTMLElement
+          const style = window.getComputedStyle(child)
+          const marginTop = parseFloat(style.marginTop || '0')
+          const marginBottom = parseFloat(style.marginBottom || '0')
+          currentHeight += (child.offsetHeight || 0) + marginTop + marginBottom
+        }
+
+        if (currentHeight > MAX_PAGE_CONTENT_HEIGHT && currentPage.children.length > 1) {
+          currentPage.removeChild(block)
+
+          currentPage = createNewPage()
+          tempContainer.appendChild(currentPage)
+          pages.push(currentPage)
+
+          currentPage.appendChild(block)
+        }
+      }
+
+      sourceElement.style.display = originalDisplay
+
       const pdf = new jsPDF({
         orientation: 'p',
-        unit: 'mm',
-        format: 'a4',
+        unit: 'px',
+        format: [794, 1123],
       })
 
-      const imgWidth = 210
-      const pageHeight = 295
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
+      for (let i = 0; i < pages.length; i++) {
+        if (i > 0) {
+          pdf.addPage()
+        }
 
-      let position = 0
+        // Footer element
+        const footer = document.createElement('div')
+        footer.style.position = 'absolute'
+        footer.style.bottom = '25px'
+        footer.style.left = '60px'
+        footer.style.right = '60px'
+        footer.style.display = 'flex'
+        footer.style.justifyContent = 'space-between'
+        footer.style.fontSize = '9px'
+        footer.style.color = '#94A3B8'
+        footer.style.borderTop = '1px solid #E2E8F0'
+        footer.style.paddingTop = '8px'
+        footer.style.fontFamily = 'sans-serif'
+        footer.innerHTML = `<span>Centras Echo · Официальный протокол</span><span>Страница ${i + 1} из ${pages.length}</span>`
+        pages[i].appendChild(footer)
 
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
+        const canvas = await html2canvas(pages[i], {
+          scale: 2.2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+        })
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
+        const imgData = canvas.toDataURL('image/jpeg', 0.92)
+        pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123)
       }
+
+      document.body.removeChild(tempContainer)
 
       const filename = `Protocol_${meeting.title.replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s]/g, '_')}.pdf`
       pdf.save(filename)
@@ -873,14 +932,14 @@ function PrintProtocol({
   return (
     <div className={styles.printOnlyContainer}>
       {/* Title page / Header */}
-      <div className={styles.printHeader}>
+      <div className={`pdf-section ${styles.printHeader}`}>
         <div className={styles.printLogo}>
           <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
-            <rect x="2" y="10" width="18" height="16" rx="4" fill="#0033A0"/>
-            <path d="M20 14L27 10V26L20 22V14Z" fill="#0033A0"/>
-            <path d="M31 13C32.5 15 32.5 21 31 23" stroke="#0033A0" strokeWidth="2.5" strokeLinecap="round"/>
+            <rect x="2" y="10" width="18" height="16" rx="4" fill="#2563EB"/>
+            <path d="M20 14L27 10V26L20 22V14Z" fill="#2563EB"/>
+            <path d="M31 13C32.5 15 32.5 21 31 23" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round"/>
           </svg>
-          <span className={styles.printLogoTitle}>Centras.Echo</span>
+          <span className={styles.printLogoTitle}>Centras Echo</span>
         </div>
         <div className={styles.printDocType}>Официальный протокол встречи</div>
         <h1 className={styles.printTitle}>{meeting.title}</h1>
@@ -896,7 +955,7 @@ function PrintProtocol({
           </div>
           <div className={styles.printMetaItem}>
             <span className={styles.printMetaLabel}>Организатор</span>
-            <span className={styles.printMetaVal}>Идентификатор: {meeting.creatorId.substring(0, 8)}</span>
+            <span className={styles.printMetaVal}>ID: {meeting.creatorId.substring(0, 8)}</span>
           </div>
           <div className={styles.printMetaItem}>
             <span className={styles.printMetaLabel}>Участников</span>
@@ -904,7 +963,7 @@ function PrintProtocol({
           </div>
         </div>
 
-        <div style={{ marginTop: '20px' }}>
+        <div style={{ marginTop: '16px' }}>
           <span className={styles.printMetaLabel}>Список участников</span>
           <div className={styles.printParticipantList}>
             {participantNames.map((name, i) => (
@@ -915,7 +974,7 @@ function PrintProtocol({
       </div>
 
       {/* Section: Metrics */}
-      <div className={styles.printSection}>
+      <div className={`pdf-section ${styles.printSection}`}>
         <h2 className={styles.printSectionTitle}>Метрики встречи</h2>
         <div className={styles.printMetricsGrid}>
           <div className={styles.printMetricCard}>
@@ -943,137 +1002,157 @@ function PrintProtocol({
             <div className={styles.printMetricLabel}>Задачи</div>
           </div>
         </div>
+      </div>
 
-        {speakerStats.length > 0 && (
-          <div style={{ marginTop: '20px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '10px', color: '#121826' }}>
-              Активность участников во встрече
-            </h3>
-            <table className={styles.printTable}>
+      {/* Section: Speaker stats */}
+      {speakerStats.length > 0 && (
+        <>
+          <div className={`pdf-section ${styles.printSection}`} style={{ marginBottom: '8px' }}>
+            <h2 className={styles.printSectionTitle}>Активность участников во встрече</h2>
+            <table className={styles.printTable} style={{ marginBottom: 0 }}>
               <thead>
                 <tr>
-                  <th>Участник</th>
-                  <th>Сказано фраз</th>
-                  <th>Сказано слов</th>
+                  <th style={{ width: '30%' }}>Участник</th>
+                  <th style={{ width: '20%' }}>Сказано фраз</th>
+                  <th style={{ width: '20%' }}>Сказано слов</th>
                   <th>Доля участия (% фраз)</th>
                 </tr>
               </thead>
-              <tbody>
-                {speakerStats.map((stat, i) => (
-                  <tr key={i}>
-                    <td>{stat.name}</td>
-                    <td>{stat.phrases}</td>
-                    <td>{stat.words}</td>
-                    <td>{stat.percentage}%</td>
-                  </tr>
-                ))}
-              </tbody>
             </table>
           </div>
-        )}
-      </div>
+          {speakerStats.map((stat, i) => (
+            <div key={i} className="pdf-section" style={{ width: '100%' }}>
+              <table className={styles.printTable} style={{ marginTop: 0 }}>
+                <tbody>
+                  <tr>
+                    <td style={{ width: '30%' }}>{stat.name}</td>
+                    <td style={{ width: '20%' }}>{stat.phrases}</td>
+                    <td style={{ width: '20%' }}>{stat.words}</td>
+                    <td>
+                      <div className={styles.printProgressBarContainer}>
+                        <div className={styles.printProgressBar}>
+                          <div className={styles.printProgressBarFill} style={{ width: `${stat.percentage}%` }} />
+                        </div>
+                        <span className={styles.printProgressVal}>{stat.percentage}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </>
+      )}
 
       {/* Section: Senti Summary */}
-      <div className={styles.printSection}>
-        <h2 className={styles.printSectionTitle}>Резюме встречи</h2>
+      <div className={`pdf-section ${styles.printSection}`}>
+        <h2 className={styles.printSectionTitle}>Резюме встречи (ИИ Senti)</h2>
         <p className={styles.printSummaryText}>{s.summary}</p>
       </div>
 
       {/* Section: Decisions */}
-      <div className={styles.printSection}>
-        <h2 className={styles.printSectionTitle}>Принятые решения ({s.decisions.length})</h2>
-        {s.decisions.length === 0 ? (
-          <p style={{ fontStyle: 'italic', color: '#667085' }}>Решений не зафиксировано</p>
-        ) : (
-          <table className={styles.printTable}>
-            <thead>
-              <tr>
-                <th style={{ width: '15%' }}>Статус</th>
-                <th style={{ width: '25%' }}>Инициатор</th>
-                <th>Текст решения</th>
-              </tr>
-            </thead>
-            <tbody>
-              {s.decisions.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    <span className={`${styles.printDecisionStatus} ${
-                      d.status === 'approved'
-                        ? styles.printDecisionApproved
-                        : d.status === 'rejected'
-                        ? styles.printDecisionRejected
-                        : styles.printDecisionPending
-                    }`}>
-                      {d.status === 'approved' ? 'Принято' : d.status === 'rejected' ? 'Отклонено' : 'Ожидает'}
-                    </span>
-                  </td>
-                  <td>{d.initiator}</td>
-                  <td>{d.text}</td>
+      {s.decisions.length > 0 && (
+        <>
+          <div className={`pdf-section ${styles.printSection}`} style={{ marginBottom: '8px' }}>
+            <h2 className={styles.printSectionTitle}>Принятые решения ({s.decisions.length})</h2>
+            <table className={styles.printTable} style={{ marginBottom: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '15%' }}>Статус</th>
+                  <th style={{ width: '25%' }}>Инициатор</th>
+                  <th>Текст решения</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+            </table>
+          </div>
+          {s.decisions.map((d) => (
+            <div key={d.id} className="pdf-section" style={{ width: '100%' }}>
+              <table className={styles.printTable} style={{ marginTop: 0 }}>
+                <tbody>
+                  <tr>
+                    <td style={{ width: '15%' }}>
+                      <span className={`${styles.printDecisionStatus} ${
+                        d.status === 'approved'
+                          ? styles.printDecisionApproved
+                          : d.status === 'rejected'
+                          ? styles.printDecisionRejected
+                          : styles.printDecisionPending
+                      }`}>
+                        {d.status === 'approved' ? 'Принято' : d.status === 'rejected' ? 'Отклонено' : 'Ожидает'}
+                      </span>
+                    </td>
+                    <td style={{ width: '25%' }}>{d.initiator}</td>
+                    <td>{d.text}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </>
+      )}
 
       {/* Section: Tasks */}
-      <div className={styles.printSection}>
-        <h2 className={styles.printSectionTitle}>Задачи и поручения ({s.tasks.length})</h2>
-        {s.tasks.length === 0 ? (
-          <p style={{ fontStyle: 'italic', color: '#667085' }}>Задач не назначено</p>
-        ) : (
-          <table className={styles.printTable}>
-            <thead>
-              <tr>
-                <th style={{ width: '40%' }}>Исполнитель</th>
-                <th style={{ width: '25%' }}>Срок</th>
-                <th>Описание задачи</th>
-              </tr>
-            </thead>
-            <tbody>
-              {s.tasks.map((t) => (
-                <tr key={t.id}>
-                  <td><strong>{t.assignee}</strong></td>
-                  <td>{t.deadline || '—'}</td>
-                  <td>{t.text}</td>
+      {s.tasks.length > 0 && (
+        <>
+          <div className={`pdf-section ${styles.printSection}`} style={{ marginBottom: '8px' }}>
+            <h2 className={styles.printSectionTitle}>Задачи и поручения ({s.tasks.length})</h2>
+            <table className={styles.printTable} style={{ marginBottom: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '30%' }}>Исполнитель</th>
+                  <th style={{ width: '20%' }}>Срок</th>
+                  <th>Описание задачи</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+            </table>
+          </div>
+          {s.tasks.map((t) => (
+            <div key={t.id} className="pdf-section" style={{ width: '100%' }}>
+              <table className={styles.printTable} style={{ marginTop: 0 }}>
+                <tbody>
+                  <tr>
+                    <td style={{ width: '30%' }}><strong>{t.assignee}</strong></td>
+                    <td style={{ width: '20%' }}>{t.deadline || '—'}</td>
+                    <td>{t.text}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </>
+      )}
 
       {/* Section: Key Moments */}
       {s.keyMoments.length > 0 && (
-        <div className={styles.printSection}>
-          <h2 className={styles.printSectionTitle}>Ключевые моменты</h2>
-          <div className={styles.printKeyMoments}>
-            {s.keyMoments.map((km, i) => (
-              <div key={i} className={styles.printKeyMoment}>
-                <span className={styles.printKeyMomentTime}>{formatSec(km.sec)}</span>
-                <span className={styles.printKeyMomentLabel}>{km.label}</span>
-              </div>
-            ))}
+        <>
+          <div className={`pdf-section ${styles.printSection}`} style={{ marginBottom: '8px' }}>
+            <h2 className={styles.printSectionTitle}>Ключевые моменты</h2>
           </div>
-        </div>
+          {s.keyMoments.map((km, i) => (
+            <div key={i} className={`pdf-section ${styles.printKeyMoment}`} style={{ width: '100%', marginBottom: '6px' }}>
+              <span className={styles.printKeyMomentTime}>{formatSec(km.sec)}</span>
+              <span className={styles.printKeyMomentLabel}>{km.label}</span>
+            </div>
+          ))}
+        </>
       )}
 
       {/* Section: Transcript */}
       {transcript.length > 0 && (
-        <div className={styles.printSection} style={{ pageBreakBefore: 'always' }}>
-          <h2 className={styles.printSectionTitle}>Полный транскрипт встречи</h2>
-          <div className={styles.printTranscriptList}>
-            {transcript.map((entry) => (
-              <div key={entry.id} className={styles.printTranscriptEntry}>
-                <span className={styles.printTranscriptTime}>{formatSec(entry.startSec)}</span>
-                <div style={{ flex: 1 }}>
-                  <div className={styles.printTranscriptSpeaker}>{entry.speakerName}</div>
-                  <div className={styles.printTranscriptPhrase}>{entry.phrase}</div>
-                </div>
-              </div>
-            ))}
+        <>
+          <div className={`pdf-section ${styles.printSection}`} style={{ marginBottom: '12px' }}>
+            <h2 className={styles.printSectionTitle}>Полный транскрипт встречи</h2>
           </div>
-        </div>
+          {transcript.map((entry) => (
+            <div key={entry.id} className={`pdf-section ${styles.printTranscriptEntry}`}>
+              <span className={styles.printTranscriptTime}>{formatSec(entry.startSec)}</span>
+              <div style={{ flex: 1 }}>
+                <div className={styles.printTranscriptSpeaker}>{entry.speakerName}</div>
+                <div className={styles.printTranscriptPhrase}>{entry.phrase}</div>
+              </div>
+            </div>
+          ))}
+        </>
       )}
     </div>
   )
