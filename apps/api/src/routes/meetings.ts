@@ -282,11 +282,15 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(400).send({ error: { code: 'NO_FILE', message: 'No file uploaded' } })
       }
 
-      if (fileData.mimetype !== 'audio/mpeg' && fileData.mimetype !== 'audio/mp3' && !fileData.filename.endsWith('.mp3')) {
-        return reply.status(400).send({ error: { code: 'INVALID_FORMAT', message: 'Only MP3 files are allowed' } })
+      const allowedMimeTypes = ['audio/mpeg', 'audio/mp3', 'audio/webm', 'audio/ogg', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/mp4', 'video/webm']
+      const allowedExtensions = ['.mp3', '.webm', '.ogg', '.wav', '.aac', '.m4a', '.mp4']
+      const ext = fileData.filename.slice(fileData.filename.lastIndexOf('.')).toLowerCase()
+
+      if (!allowedMimeTypes.includes(fileData.mimetype) && !allowedExtensions.includes(ext)) {
+        return reply.status(400).send({ error: { code: 'INVALID_FORMAT', message: 'Unsupported audio format. Supported formats: MP3, WebM, Ogg, WAV, AAC, M4A' } })
       }
 
-      const audioPath = `/data/audio/${id}.mp3`
+      const audioPath = `/data/audio/${id}${ext}`
       
       // Ensure directory exists
       const fs = await import('fs')

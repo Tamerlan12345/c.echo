@@ -173,45 +173,30 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
       })
     }
 
-    // Start LiveKit Egress — composite audio file to Railway Volume
-    const client = getEgressClient()
-    const outputPath = `/data/audio/${meetingId}.mp3`
-
+    // Mark meeting as recording in DB
     try {
-      const egress = await client.startRoomCompositeEgress(meeting.rows[0].livekit_room, {
-        file: {
-          filepath: outputPath,
-          fileType: 4, // MP3
-        } as any,
-      })
-
-      // Store egress ID for later stop
       await pool.query(
         `UPDATE meetings
-         SET is_recorded = TRUE, egress_id = $1
-         WHERE id = $2`,
-        [egress.egressId, meetingId],
+         SET is_recorded = TRUE, egress_id = 'client-recorded'
+         WHERE id = $1`,
+        [meetingId],
       )
-
-      return reply.send({ data: { recording: true, egressId: egress.egressId } })
+      return reply.send({ data: { recording: true, egressId: 'client-recorded' } })
     } catch (err: any) {
-      app.log.error({ err, meetingId }, `Failed to start LiveKit egress: ${err.message} - ${err.stack}`)
+      app.log.error({ err, meetingId }, 'Failed to start recording state')
       return reply.status(500).send({
-        error: {
-          code: 'EGRESS_START_FAILED',
-          message: err.message || 'Не удалось запустить службу записи LiveKit. Проверьте подключение Redis на сервере LiveKit.',
-        },
+        error: { code: 'RECORDING_START_FAILED', message: err.message },
       })
     }
   })
 
-  // POST /api/livekit/egress/stop — stop recording + trigger Senti pipeline
+  // POST /api/livekit/egress/stop — stop recording (client-side recorder coordinates upload)
   app.post('/egress/stop', async (request, reply) => {
     const user = request.user as { sub: string }
     const { meetingId } = request.body as { meetingId: string }
 
     const meeting = await pool.query(
-      'SELECT creator_id, livekit_room, egress_id FROM meetings WHERE id = $1',
+      'SELECT creator_id FROM meetings WHERE id = $1',
       [meetingId],
     )
     if (!meeting.rows[0]) {
@@ -221,41 +206,19 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only host can stop recording' } })
     }
 
-    const egressId = meeting.rows[0].egress_id
-    if (!egressId) {
-      return reply.status(400).send({ error: { code: 'NO_RECORDING', message: 'No active recording found' } })
-    }
-
     try {
-      const client = getEgressClient()
-      await client.stopEgress(egressId)
+      await pool.query(
+        `UPDATE meetings
+         SET is_recorded = FALSE
+         WHERE id = $1`,
+        [meetingId],
+      )
+      return reply.send({ data: { stopped: true } })
     } catch (err: any) {
-      app.log.error({ err, egressId }, `Failed to stop LiveKit egress: ${err.message} - ${err.stack}`)
+      app.log.error({ err, meetingId }, 'Failed to stop recording state')
       return reply.status(500).send({
-        error: {
-          code: 'EGRESS_STOP_FAILED',
-          message: err.message || 'Failed to stop LiveKit egress',
-        },
+        error: { code: 'RECORDING_STOP_FAILED', message: err.message },
       })
     }
-
-    // Mark as processing — Senti pipeline starts async
-    await pool.query(
-      "UPDATE meetings SET senti_status = 'processing' WHERE id = $1",
-      [meetingId],
-    )
-
-    // Trigger AI pipeline (non-blocking)
-    const audioPath = `/data/audio/${meetingId}.mp3`
-
-    // Import and run pipeline asynchronously
-    import('../services/gemini.js').then(({ runSentiPipeline }) => {
-      runSentiPipeline(meetingId, audioPath).catch((err) => {
-        app.log.error({ err, meetingId }, 'Senti pipeline failed')
-        pool.query("UPDATE meetings SET senti_status = 'failed' WHERE id = $1", [meetingId])
-      })
-    })
-
-    return reply.send({ data: { stopped: true, sentiStatus: 'processing' } })
   })
 }

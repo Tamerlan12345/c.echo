@@ -36,6 +36,17 @@ const SentiOutputSchema = z.object({
 
 type SentiOutput = z.infer<typeof SentiOutputSchema>
 
+// Helper to detect audio MIME type from file path extension
+function getMimeTypeFromPath(filePath: string): string {
+  const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
+  if (ext === '.webm') return 'audio/webm'
+  if (ext === '.ogg') return 'audio/ogg'
+  if (ext === '.wav') return 'audio/wav'
+  if (ext === '.aac') return 'audio/aac'
+  if (ext === '.mp4' || ext === '.m4a') return 'audio/mp4'
+  return 'audio/mp3' // default fallback
+}
+
 // ─── Main pipeline ────────────────────────────────────────────────────────────
 
 export async function runSentiPipeline(meetingId: string, audioPath: string): Promise<void> {
@@ -71,7 +82,7 @@ export async function runSentiPipeline(meetingId: string, audioPath: string): Pr
       const result = await model.generateContent([
         {
           inlineData: {
-            mimeType: 'audio/mp3',
+            mimeType: getMimeTypeFromPath(audioPath),
             data: audioBase64,
           },
         },
