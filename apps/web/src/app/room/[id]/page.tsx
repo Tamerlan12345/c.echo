@@ -540,6 +540,9 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
   const isHost = meeting.creatorId === user.id
 
+  // LiveKit participant.identity === user.id (set in /api/livekit token route).
+  const connectedIdentities = new Set(allParticipants.map((p) => p.identity))
+
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -1137,6 +1140,16 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
   }
 
+  // Consent counts only people who are currently connected to the room.
+  // The DB tracks consent for everyone who ever joined, but participants who left
+  // shouldn't block recording or be asked for consent again.
+  const liveConsentParticipants = (consentStatus?.participants ?? []).filter((p) =>
+    connectedIdentities.has(p.userId),
+  )
+  const liveConsentTotal = liveConsentParticipants.length
+  const liveConsented = liveConsentParticipants.filter((p) => p.hasConsented).length
+  const liveAllConsented = liveConsentTotal > 0 && liveConsented === liveConsentTotal
+
   return (
     <div className={styles.roomLayout}>
       {/* ── Participants sidebar ── */}
@@ -1576,22 +1589,27 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                       <div
                         className={styles.consentBarFill}
                         style={{
-                          width: consentStatus.total > 0
-                            ? `${(consentStatus.consented / consentStatus.total) * 100}%`
+                          width: liveConsentTotal > 0
+                            ? `${(liveConsented / liveConsentTotal) * 100}%`
                             : '0%'
                         }}
                       />
                     </div>
                     <div className={styles.consentNumbers}>
                       <span style={{ color: 'var(--color-success)', fontSize: '0.75rem', fontWeight: 600 }}>
-                        {consentStatus.consented} дали согласие
+                        {liveConsented} дали согласие
                       </span>
                       <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                        из {consentStatus.total}
+                        из {liveConsentTotal}
                       </span>
                     </div>
                     <div className={styles.consentParticipants}>
-                      {consentStatus.participants?.map((p) => (
+                      {liveConsentParticipants.length === 0 ? (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                          Нет участников в комнате
+                        </div>
+                      ) : (
+                        liveConsentParticipants.map((p) => (
                           <div key={p.userId} className={styles.consentParticipantRow}>
                             <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
                               {p.name}
@@ -1601,13 +1619,14 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                               : <Circle size={14} color="var(--color-text-muted)" className={styles.consentIcon} />
                             }
                           </div>
-                        ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Action button for host */}
-                {isHost && consentStatus?.allConsented && !isRecording && (
+                {isHost && liveAllConsented && !isRecording && (
                   <button
                     id="start-recording-btn"
                     className="btn btn-amber"
@@ -1619,7 +1638,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                   </button>
                 )}
 
-                {isHost && (!consentStatus || !consentStatus.allConsented) && (
+                {isHost && !liveAllConsented && (
                   <button
                     id="request-consent-btn"
                     className="btn btn-ghost"
