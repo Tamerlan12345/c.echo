@@ -91,6 +91,13 @@ export default function RoomPage() {
   const [isEnded, setIsEnded] = useState(false)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Pre-join state — chosen by the user before connecting to LiveKit.
+  const [preJoinDone, setPreJoinDone] = useState(false)
+  const [selectedCamId, setSelectedCamId] = useState<string | undefined>(undefined)
+  const [selectedMicId, setSelectedMicId] = useState<string | undefined>(undefined)
+  const [initialCamEnabled, setInitialCamEnabled] = useState(true)
+  const [initialMicEnabled, setInitialMicEnabled] = useState(true)
+
   const init = useCallback(async () => {
     // 1. Try to load authenticated user profile
     const meRes = await authApi.me({ skipRedirect: true })
@@ -489,13 +496,31 @@ export default function RoomPage() {
     )
   }
 
+  if (!preJoinDone) {
+    return (
+      <PreJoinScreen
+        meetingTitle={meeting.title}
+        userName={user.name}
+        selectedCamId={selectedCamId}
+        selectedMicId={selectedMicId}
+        micEnabled={initialMicEnabled}
+        camEnabled={initialCamEnabled}
+        onCamChange={setSelectedCamId}
+        onMicChange={setSelectedMicId}
+        onToggleMic={() => setInitialMicEnabled((v) => !v)}
+        onToggleCam={() => setInitialCamEnabled((v) => !v)}
+        onJoin={() => setPreJoinDone(true)}
+      />
+    )
+  }
+
   return (
     <LiveKitRoom
       token={token}
       serverUrl={serverUrl}
       connect={true}
-      video={true}
-      audio={true}
+      video={initialCamEnabled ? (selectedCamId ? { deviceId: selectedCamId } : true) : false}
+      audio={initialMicEnabled ? (selectedMicId ? { deviceId: selectedMicId } : true) : false}
       onDisconnected={() => {
         const isGuest = user?.email.endsWith('@guest.centras-echo.local')
         if (isGuest) {
@@ -512,6 +537,263 @@ export default function RoomPage() {
       <RoomAudioRenderer />
       <RoomInner meeting={meeting} user={user} meetingId={id} router={router} />
     </LiveKitRoom>
+  )
+}
+
+// ─── Pre-join screen (device pick + preview before LiveKit connect) ───────────
+
+interface PreJoinScreenProps {
+  meetingTitle: string
+  userName: string
+  selectedCamId: string | undefined
+  selectedMicId: string | undefined
+  micEnabled: boolean
+  camEnabled: boolean
+  onCamChange: (id: string) => void
+  onMicChange: (id: string) => void
+  onToggleMic: () => void
+  onToggleCam: () => void
+  onJoin: () => void
+}
+
+function PreJoinScreen({
+  meetingTitle, userName,
+  selectedCamId, selectedMicId,
+  micEnabled, camEnabled,
+  onCamChange, onMicChange,
+  onToggleMic, onToggleCam,
+  onJoin,
+}: PreJoinScreenProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const [cams, setCams] = useState<MediaDeviceInfo[]>([])
+  const [mics, setMics] = useState<MediaDeviceInfo[]>([])
+  const [audioLevel, setAudioLevel] = useState(0)
+  const [permissionError, setPermissionError] = useState<string | null>(null)
+
+  // Stop existing preview stream
+  const stopStream = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+  }, [])
+
+  // Acquire / re-acquire preview stream when device choices or enable flags change
+  useEffect(() => {
+    let cancelled = false
+
+    const acquire = async () => {
+      stopStream()
+      if (!camEnabled && !micEnabled) {
+        setAudioLevel(0)
+        return
+      }
+      try {
+        const constraints: MediaStreamConstraints = {
+          video: camEnabled
+            ? (selectedCamId ? { deviceId: { exact: selectedCamId } } : true)
+            : false,
+          audio: micEnabled
+            ? (selectedMicId ? { deviceId: { exact: selectedMicId } } : true)
+            : false,
+        }
+        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        streamRef.current = stream
+        if (videoRef.current && camEnabled) {
+          videoRef.current.srcObject = stream
+        }
+
+        // Audio level meter
+        if (micEnabled && stream.getAudioTracks().length > 0) {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+          const ctx = new AudioCtx()
+          audioCtxRef.current = ctx
+          const src = ctx.createMediaStreamSource(stream)
+          const analyser = ctx.createAnalyser()
+          analyser.fftSize = 512
+          src.connect(analyser)
+          const buf = new Uint8Array(analyser.frequencyBinCount)
+          const tick = () => {
+            analyser.getByteFrequencyData(buf)
+            let sum = 0
+            for (let i = 0; i < buf.length; i++) sum += buf[i]
+            const avg = sum / buf.length / 255
+            setAudioLevel(avg)
+            rafRef.current = requestAnimationFrame(tick)
+          }
+          tick()
+        }
+
+        // Populate device lists once permission is granted (labels become visible)
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        if (cancelled) return
+        setCams(devices.filter((d) => d.kind === 'videoinput'))
+        setMics(devices.filter((d) => d.kind === 'audioinput'))
+        setPermissionError(null)
+      } catch (err: any) {
+        setPermissionError(
+          err?.name === 'NotAllowedError'
+            ? 'Доступ к камере или микрофону не предоставлен. Разрешите его в браузере и обновите страницу.'
+            : 'Не удалось получить доступ к устройствам: ' + (err?.message ?? 'неизвестная ошибка'),
+        )
+      }
+    }
+
+    acquire()
+
+    return () => {
+      cancelled = true
+      stopStream()
+    }
+  }, [selectedCamId, selectedMicId, camEnabled, micEnabled, stopStream])
+
+  const handleJoin = () => {
+    stopStream()
+    onJoin()
+  }
+
+  const levelPct = Math.min(100, Math.round(audioLevel * 180))
+
+  return (
+    <div className={styles.welcomeLayout}>
+      <div className={styles.welcomeCard} style={{ maxWidth: 560 }}>
+        <div className={styles.welcomeHeader}>
+          <div className={styles.welcomeLogo}>
+            <Logo size={42} centered />
+          </div>
+          <h1 className={styles.welcomeTitle}>Готовы войти?</h1>
+          <p className={styles.welcomeSubtitle}>{meetingTitle} · {userName}</p>
+        </div>
+
+        {/* Video preview */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '16 / 9',
+          background: '#000',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          marginBottom: 'var(--space-4)',
+          border: '1px solid var(--color-border)',
+        }}>
+          {camEnabled ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+            />
+          ) : (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+              Камера выключена
+            </div>
+          )}
+        </div>
+
+        {permissionError && (
+          <div style={{ background: 'var(--color-danger-dim, rgba(229,0,18,0.08))', color: 'var(--color-danger)', padding: '10px 12px', borderRadius: 'var(--radius-md)', fontSize: '0.8125rem', marginBottom: 'var(--space-4)' }}>
+            {permissionError}
+          </div>
+        )}
+
+        {/* Device selectors */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>Камера</span>
+            <select
+              className="input-field"
+              value={selectedCamId ?? ''}
+              onChange={(e) => onCamChange(e.target.value || '')}
+              disabled={!camEnabled || cams.length === 0}
+              style={{ width: '100%' }}
+            >
+              {cams.length === 0 && <option value="">Устройства не найдены</option>}
+              {cams.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Камера ${d.deviceId.slice(0, 6)}`}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>Микрофон</span>
+            <select
+              className="input-field"
+              value={selectedMicId ?? ''}
+              onChange={(e) => onMicChange(e.target.value || '')}
+              disabled={!micEnabled || mics.length === 0}
+              style={{ width: '100%' }}
+            >
+              {mics.length === 0 && <option value="">Устройства не найдены</option>}
+              {mics.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Микрофон ${d.deviceId.slice(0, 6)}`}
+                </option>
+              ))}
+            </select>
+            {/* Audio level meter */}
+            <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden', marginTop: 4 }}>
+              <div style={{
+                height: '100%',
+                width: `${levelPct}%`,
+                background: levelPct > 60 ? 'var(--color-success)' : 'var(--color-accent-blue)',
+                transition: 'width 60ms linear',
+              }} />
+            </div>
+          </label>
+        </div>
+
+        {/* Mic / Cam toggle + Join */}
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+          <button
+            type="button"
+            className={`btn btn-ghost`}
+            onClick={onToggleMic}
+            title={micEnabled ? 'Выключить микрофон' : 'Включить микрофон'}
+            style={{ width: 44, height: 44, padding: 0, justifyContent: 'center' }}
+          >
+            {micEnabled ? <Mic size={18} /> : <MicOff size={18} color="var(--color-danger)" />}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-ghost`}
+            onClick={onToggleCam}
+            title={camEnabled ? 'Выключить камеру' : 'Включить камеру'}
+            style={{ width: 44, height: 44, padding: 0, justifyContent: 'center' }}
+          >
+            {camEnabled ? <Video size={18} /> : <VideoOff size={18} color="var(--color-danger)" />}
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleJoin}
+            style={{ flex: 1, padding: '12px', fontSize: '0.9375rem' }}
+          >
+            Войти в комнату
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

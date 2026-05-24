@@ -16,7 +16,10 @@
       "Bash(findstr \":3000 :3001\")",
       "Bash(netstat -ano)",
       "Bash(findstr \"LISTENING\")",
-      "Bash(findstr \"3000 3001\")"
+      "Bash(findstr \"3000 3001\")",
+      "Bash(findstr /R \"\\\\.tsx$ \\\\.ts$\")",
+      "Bash(findstr /V \"node_modules .next\")",
+      "Bash(findstr \"apps/\")"
     ]
   }
 }
