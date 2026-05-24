@@ -73,7 +73,7 @@
 .searchInput::placeholder { color: var(--color-text-disabled); }
 .searchInput:focus {
   border-color: var(--color-accent-blue);
-  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(138, 0, 90, 0.18);
 }
 
 .filterSelect {
@@ -107,6 +107,7 @@
   border-radius: var(--radius-lg);
   padding: var(--space-5);
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
   transition:
     border-color var(--transition-base),
     box-shadow var(--transition-base),
@@ -120,8 +121,8 @@
 
 .card:hover {
   border-color: var(--color-border-hover);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), var(--shadow-glow-brand);
+  transform: translateY(-3px);
 }
 
 .cardTop {

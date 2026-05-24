@@ -23,21 +23,21 @@
   pointer-events: none;
 }
 .orb1 {
-  width: 500px; height: 500px;
-  top: -150px; left: -150px;
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.12) 0%, transparent 70%);
+  width: 520px; height: 520px;
+  top: -160px; left: -160px;
+  background: radial-gradient(circle, rgba(229, 0, 18, 0.16) 0%, transparent 70%);
   animation: orb-float 12s ease-in-out infinite;
 }
 .orb2 {
-  width: 400px; height: 400px;
-  bottom: -100px; right: -100px;
-  background: radial-gradient(circle, rgba(255, 183, 3, 0.1) 0%, transparent 70%);
+  width: 420px; height: 420px;
+  bottom: -110px; right: -110px;
+  background: radial-gradient(circle, rgba(138, 0, 90, 0.18) 0%, transparent 70%);
   animation: orb-float 15s ease-in-out infinite reverse;
 }
 .orb3 {
-  width: 300px; height: 300px;
+  width: 320px; height: 320px;
   top: 50%; left: 60%;
-  background: radial-gradient(circle, rgba(0, 102, 204, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(0, 51, 160, 0.16) 0%, transparent 70%);
   animation: orb-float 10s ease-in-out infinite 3s;
 }
 
@@ -47,11 +47,14 @@
   z-index: 1;
   width: 100%;
   max-width: 420px;
-  background: var(--color-bg-surface);
+  background:
+    radial-gradient(at 0% 0%, rgba(229, 0, 18, 0.06), transparent 55%),
+    radial-gradient(at 100% 100%, rgba(0, 51, 160, 0.08), transparent 55%),
+    var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   padding: var(--space-8);
-  box-shadow: var(--shadow-lg), 0 0 60px rgba(0, 212, 255, 0.05);
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(138, 0, 90, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   animation: fade-up 0.5s ease both;
 }
 
@@ -64,7 +67,7 @@
 }
 .logoIcon {
   flex-shrink: 0;
-  filter: drop-shadow(0 0 16px rgba(0, 212, 255, 0.4));
+  filter: drop-shadow(0 0 18px rgba(138, 0, 90, 0.45));
 }
 .logoTitle {
   font-size: 1.625rem;

@@ -118,14 +118,28 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  transition: border-color var(--transition-base);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
 }
-.statCard:hover { border-color: var(--color-border-hover); }
-.statCard_blue  { border-left: 3px solid var(--color-accent-blue); }
-.statCard_amber { border-left: 3px solid var(--color-accent-amber); }
+.statCard:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-md), var(--shadow-glow-brand);
+  transform: translateY(-2px);
+}
+.statCard_blue  {
+  border-left: 4px solid var(--color-accent-blue);
+  background: linear-gradient(90deg, var(--color-accent-blue-dim) 0%, transparent 35%), var(--color-bg-surface);
+}
+.statCard_amber {
+  border-left: 4px solid var(--color-accent-amber);
+  background: linear-gradient(90deg, var(--color-accent-amber-dim) 0%, transparent 35%), var(--color-bg-surface);
+}
 .statIcon { padding: var(--space-2); border-radius: var(--radius-sm); display: inline-flex; }
-.statIcon_blue  { background: var(--color-accent-blue-dim);  color: var(--color-accent-blue); }
-.statIcon_amber { background: var(--color-accent-amber-dim); color: var(--color-accent-amber); }
+.statIcon_blue  { background: var(--color-accent-blue-dim);  color: #D277AA; }
+.statIcon_amber { background: var(--color-accent-amber-dim); color: #FF6E7E; }
 .statValue {
   font-size: 1.625rem;
   font-weight: 800;
@@ -176,11 +190,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
 }
 .meetingCard:hover {
   border-color: var(--color-border-hover);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md), var(--shadow-glow-brand);
+  transform: translateY(-2px);
 }
 .meetingCardTop {
   display: flex;

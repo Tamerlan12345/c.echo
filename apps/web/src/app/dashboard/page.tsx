@@ -51,9 +51,23 @@ export default function DashboardPage() {
     if (!newTitle.trim() || !canCreate) return
     setCreating(true)
 
+    let utcScheduledStart: string | null = null
+    if (isScheduled && scheduleTime) {
+      try {
+        const [datePart, timePart] = scheduleTime.split('T')
+        const [year, month, day] = datePart.split('-').map(Number)
+        const [hours, minutes] = timePart.split(':').map(Number)
+        const localDate = new Date(year, month - 1, day, hours, minutes)
+        utcScheduledStart = localDate.toISOString()
+      } catch (err) {
+        console.error('Failed to parse scheduled time:', err)
+        utcScheduledStart = new Date(scheduleTime).toISOString()
+      }
+    }
+
     const res = await meetingsApi.create(
       newTitle.trim(),
-      isScheduled && scheduleTime ? new Date(scheduleTime).toISOString() : null,
+      utcScheduledStart,
       isPublic,
     )
     if ('data' in res && res.data) {
@@ -424,7 +438,7 @@ function MeetingCard({ meeting, isActive, onJoin, formatDate }: {
       </div>
       <h3 className={styles.meetingTitle}>{meeting.title}</h3>
       <p className={styles.meetingMeta}>
-        <Clock size={12} /> {formatDate(meeting.createdAt)}
+        <Clock size={12} /> {meeting.scheduledStart ? `Начало: ${formatDate(meeting.scheduledStart)}` : formatDate(meeting.createdAt)}
       </p>
       <button id={`join-meeting-${meeting.id}`} className="btn btn-primary" onClick={onJoin} style={{ width: '100%', marginTop: 'auto' }}>
         <Zap size={16} /> Войти
@@ -446,7 +460,7 @@ function PastMeetingRow({ meeting, onClick, formatDate, formatDuration }: {
       </div>
       <div className={styles.pastRowContent}>
         <span className={styles.pastRowTitle}>{meeting.title}</span>
-        <span className={styles.pastRowMeta}>{formatDate(meeting.createdAt)}</span>
+        <span className={styles.pastRowMeta}>{formatDate(meeting.scheduledStart ?? meeting.createdAt)}</span>
       </div>
       <div className={styles.pastRowDuration}>
         <Clock size={12} />

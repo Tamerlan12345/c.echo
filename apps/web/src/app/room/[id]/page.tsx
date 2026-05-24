@@ -468,6 +468,8 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     const res = await livekitApi.startRecording(meetingId)
     if ('data' in res && res.data?.recording) {
       setIsRecording(true)
+    } else if ('error' in res) {
+      alert(`Не удалось запустить запись: ${res.error?.message ?? 'Неизвестная ошибка'}`)
     }
   }
 
@@ -860,7 +862,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                   <button
                     id="request-consent-btn"
                     className="btn btn-ghost"
-                    style={{ width: '100%', borderColor: 'rgba(255,183,3,0.3)', color: 'var(--color-accent-amber)' }}
+                    style={{ width: '100%', borderColor: 'rgba(229,0,18,0.35)', color: 'var(--color-accent-amber)' }}
                     onClick={handleRequestConsent}
                   >
                     <Shield size={18} />

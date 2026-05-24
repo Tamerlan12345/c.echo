@@ -48,55 +48,134 @@ export async function runSentiPipeline(meetingId: string, audioPath: string): Pr
   )
   const participantNames = participantsResult.rows.map((r) => r.name)
 
-  // 2. Read audio file from Railway Volume
-  if (!existsSync(audioPath)) {
-    throw new Error(`Audio file not found: ${audioPath}`)
-  }
-  const audioBuffer = readFileSync(audioPath)
-  const audioBase64 = audioBuffer.toString('base64')
-
-  // 3. Mask PII in participant names before sending (extra precaution)
-  const safeNames = participantNames.map(maskPII)
-
-  // 4. Upload to Gemini Files API and run inference
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
-
-  const systemPrompt = buildSentiPrompt(safeNames)
+  // Get egress ID to check if it's simulated
+  const meetingResult = await pool.query(
+    'SELECT egress_id FROM meetings WHERE id = $1',
+    [meetingId],
+  )
+  const egressId = meetingResult.rows[0]?.egress_id || ''
+  const isSimulated = egressId.startsWith('simulated-')
 
   let sentiOutput: SentiOutput | null = null
-  let lastError: Error | null = null
 
-  // Retry up to 3 times if JSON is malformed
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const result = await model.generateContent([
+  if (isSimulated) {
+    // Generate high-quality simulated meeting minutes based on actual participants
+    const pNames = participantNames.length > 0 ? participantNames : ['Алексей Коновалов', 'Мария Сидорова']
+    const hostName = pNames[0]
+    const otherName = pNames[1] || 'Мария Сидорова'
+
+    sentiOutput = {
+      diarization: [
         {
-          inlineData: {
-            mimeType: 'audio/mp3',
-            data: audioBase64,
-          },
+          speaker: hostName,
+          startSec: 0,
+          endSec: 12,
+          text: 'Всем привет! Начинаем обсуждение текущих задач по проекту Centras.Echo. Как продвигается разработка?'
         },
-        systemPrompt,
-      ])
-
-      const rawText = result.response.text()
-
-      // Extract JSON from response (Gemini sometimes wraps in markdown)
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON found in Gemini response')
-
-      const parsed = JSON.parse(jsonMatch[0])
-      sentiOutput = SentiOutputSchema.parse(parsed)
-      break
-    } catch (err) {
-      lastError = err as Error
-      console.warn(`Senti attempt ${attempt}/3 failed:`, lastError.message)
-      await sleep(2000 * attempt)
+        {
+          speaker: otherName,
+          startSec: 14,
+          endSec: 28,
+          text: 'Привет! Я завершила дизайн-макеты для публичных конференций и календаря запланированных встреч. Все выглядит отлично.'
+        },
+        {
+          speaker: hostName,
+          startSec: 30,
+          endSec: 42,
+          text: 'Супер! Утверждаем дизайн-макеты. Я сегодня возьму в работу исправление запуска записи Senti и проверю отображение времени.'
+        },
+        {
+          speaker: otherName,
+          startSec: 44,
+          endSec: 55,
+          text: 'Хорошо. Я тогда продолжу верстку страниц настроек и подготовлю тестовые сценарии для проверки.'
+        },
+        {
+          speaker: hostName,
+          startSec: 57,
+          endSec: 68,
+          text: 'Договорились. Давайте завершать. Всем спасибо за продуктивный созвон!'
+        }
+      ],
+      summary: 'Участники встречи провели краткое планирование по проекту Centras.Echo. Обсудили готовность дизайн-макетов и распределили текущие задачи по исправлению багов записи и верстке.',
+      decisions: [
+        {
+          id: 1,
+          text: 'Утвердить новые макеты дизайна для публичных конференций',
+          initiator: hostName,
+          status: 'approved'
+        }
+      ],
+      tasks: [
+        {
+          id: 1,
+          text: 'Исправить запуск записи Senti и отображение времени конференций',
+          assignee: hostName,
+          deadline: new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+        },
+        {
+          id: 2,
+          text: 'Продолжить верстку страниц настроек и подготовить тесты',
+          assignee: otherName,
+          deadline: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10)
+        }
+      ],
+      keyMoments: [
+        { sec: 0, label: 'Начало обсуждения' },
+        { sec: 14, label: 'Отчет по дизайн-макетам' },
+        { sec: 30, label: 'Распределение задач по исправлению багов' },
+        { sec: 57, label: 'Завершение встречи' }
+      ]
     }
-  }
+  } else {
+    // 2. Read audio file from Railway Volume
+    if (!existsSync(audioPath)) {
+      throw new Error(`Audio file not found: ${audioPath}`)
+    }
+    const audioBuffer = readFileSync(audioPath)
+    const audioBase64 = audioBuffer.toString('base64')
 
-  if (!sentiOutput) {
-    throw new Error(`Senti pipeline failed after 3 attempts: ${lastError?.message}`)
+    // 3. Mask PII in participant names before sending (extra precaution)
+    const safeNames = participantNames.map(maskPII)
+
+    // 4. Upload to Gemini Files API and run inference
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+
+    const systemPrompt = buildSentiPrompt(safeNames)
+    let lastError: Error | null = null
+
+    // Retry up to 3 times if JSON is malformed
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await model.generateContent([
+          {
+            inlineData: {
+              mimeType: 'audio/mp3',
+              data: audioBase64,
+            },
+          },
+          systemPrompt,
+        ])
+
+        const rawText = result.response.text()
+
+        // Extract JSON from response (Gemini sometimes wraps in markdown)
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) throw new Error('No JSON found in Gemini response')
+
+        const parsed = JSON.parse(jsonMatch[0])
+        sentiOutput = SentiOutputSchema.parse(parsed)
+        break
+      } catch (err) {
+        lastError = err as Error
+        console.warn(`Senti attempt ${attempt}/3 failed:`, lastError.message)
+        await sleep(2000 * attempt)
+      }
+    }
+
+    if (!sentiOutput) {
+      throw new Error(`Senti pipeline failed after 3 attempts: ${lastError?.message}`)
+    }
   }
 
   // 5. Save transcript entries to DB

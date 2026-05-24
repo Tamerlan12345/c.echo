@@ -247,8 +247,9 @@
 
 .controlBtn.active {
   background: var(--color-accent-blue-dim);
-  border-color: rgba(0, 212, 255, 0.4);
-  color: var(--color-accent-blue);
+  border-color: rgba(138, 0, 90, 0.45);
+  color: #D277AA;
+  box-shadow: 0 0 16px rgba(138, 0, 90, 0.30);
 }
 
 .controlBtn.muted {
@@ -259,9 +260,9 @@
 
 .controlBtn.sentiActive {
   background: var(--color-accent-amber-dim);
-  border-color: rgba(255, 183, 3, 0.4);
-  color: var(--color-accent-amber);
-  box-shadow: 0 0 16px rgba(255, 183, 3, 0.3);
+  border-color: rgba(229, 0, 18, 0.45);
+  color: #FF6E7E;
+  box-shadow: 0 0 18px rgba(229, 0, 18, 0.35);
 }
 
 .endCallBtn {
@@ -281,7 +282,8 @@
 }
 
 .endCallBtn:hover {
-  background: #e03545;
+  background: #FF5C6B;
+  box-shadow: 0 6px 20px rgba(255, 71, 87, 0.45);
   transform: translateY(-1px);
 }
 

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"D:\\\\c.echo\\\\apps\\\\web\\\\src\\\\app\" -Recurse -Filter \"page.tsx\")",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(pnpm dev *)",
+      "Bash(pnpm exec *)"
+    ]
+  }
+}
