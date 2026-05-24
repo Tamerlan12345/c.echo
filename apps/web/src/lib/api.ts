@@ -102,6 +102,16 @@ export const authApi = {
     window.location.href = '/login'
   },
   googleLoginUrl: () => `${BASE_URL}/api/auth/google`,
+  guestLogin: async (name: string) => {
+    const res = await apiFetch<{ accessToken: string; refreshToken: string; user: User }>('/api/auth/guest', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    })
+    if ('data' in res && res.data) {
+      setTokens(res.data.accessToken, res.data.refreshToken)
+    }
+    return res
+  },
 }
 
 // ─── Meetings ─────────────────────────────────────────────────────────────────
@@ -111,10 +121,13 @@ export const meetingsApi = {
 
   get: (id: string) => apiFetch<Meeting>(`/api/meetings/${id}`),
 
-  create: (title: string) =>
+  getPublicInfo: (id: string) =>
+    apiFetch<{ id: string; title: string; scheduledStart: string | null; isPublic: boolean; creatorName: string }>(`/api/meetings/${id}/public-info`),
+
+  create: (title: string, scheduledStart?: string | null, isPublic?: boolean) =>
     apiFetch<Meeting>('/api/meetings', {
       method: 'POST',
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, scheduledStart, isPublic }),
     }),
 
   end: (id: string) =>

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import bcrypt from 'bcrypt'
 import { z } from 'zod'
+import { randomUUID } from 'crypto'
 import { pool } from '../db/pool.js'
 import type { User } from '@centras/shared'
 
@@ -134,6 +135,56 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     )
 
     return reply.send({ data: { accessToken: newAccessToken, refreshToken: newRefreshToken, expiresIn: 900 } })
+  })
+
+  // POST /api/auth/guest
+  app.post('/guest', async (request, reply) => {
+    const { name } = request.body as { name?: string }
+    if (!name || !name.trim()) {
+      return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: 'Name is required' } })
+    }
+
+    const guestId = randomUUID()
+    const guestEmail = `guest-${guestId}@guest.centras-echo.local`
+
+    await pool.query(
+      `INSERT INTO users (id, email, name, role, password_hash)
+       VALUES ($1, $2, $3, 'employee', 'GUEST_ACCOUNT')`,
+      [guestId, guestEmail, name.trim()],
+    )
+
+    const accessToken = app.jwt.sign(
+      { sub: guestId, email: guestEmail, name: name.trim(), role: 'employee' },
+      { expiresIn: '2h' },
+    )
+
+    const refreshToken = app.jwt.sign(
+      { sub: guestId, type: 'refresh' },
+      { expiresIn: '1d' },
+    )
+
+    const tokenHash = await bcrypt.hash(refreshToken, 10)
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    await pool.query(
+      'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+      [guestId, tokenHash, expiresAt],
+    )
+
+    return reply.send({
+      data: {
+        accessToken,
+        refreshToken,
+        expiresIn: 7200,
+        user: {
+          id: guestId,
+          email: guestEmail,
+          name: name.trim(),
+          role: 'employee',
+          avatarUrl: null,
+          createdAt: new Date().toISOString(),
+        },
+      },
+    })
   })
 
   // POST /api/auth/logout

@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { meetingsApi, authApi, adminApi } from '@/lib/api'
+import { meetingsApi, authApi } from '@/lib/api'
 import type { Meeting, User } from '@centras/shared'
 import styles from './dashboard.module.css'
 import {
   Video, Plus, Archive, Settings, LogOut, Users,
-  Clock, Shield, ChevronRight, Zap
+  Clock, Shield, ChevronRight, Zap,
+  Calendar, Copy, Check, Info, CalendarClock, Globe
 } from 'lucide-react'
 
 const MAX_ACTIVE = 5
@@ -22,6 +23,12 @@ export default function DashboardPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Scheduling & public states
+  const [isScheduled, setIsScheduled] = useState(false)
+  const [scheduleTime, setScheduleTime] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
   const loadData = useCallback(async () => {
     const [meRes, meetRes] = await Promise.all([authApi.me(), meetingsApi.list()])
     if ('data' in meRes) setUser(meRes.data ?? null)
@@ -31,7 +38,11 @@ export default function DashboardPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const activeMeetings = meetings.filter((m) => !m.endedAt)
+  const now = new Date()
+  const activeMeetings = meetings.filter((m) => !m.endedAt && (!m.scheduledStart || new Date(m.scheduledStart) <= now))
+  const scheduledMeetings = meetings
+    .filter((m) => !m.endedAt && m.scheduledStart && new Date(m.scheduledStart) > now)
+    .sort((a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime())
   const pastMeetings = meetings.filter((m) => m.endedAt)
   const canCreate = activeMeetings.length < MAX_ACTIVE
 
@@ -40,13 +51,31 @@ export default function DashboardPage() {
     if (!newTitle.trim() || !canCreate) return
     setCreating(true)
 
-    const res = await meetingsApi.create(newTitle.trim())
-    if ('data' in res) {
+    const res = await meetingsApi.create(
+      newTitle.trim(),
+      isScheduled && scheduleTime ? new Date(scheduleTime).toISOString() : null,
+      isPublic,
+    )
+    if ('data' in res && res.data) {
       setShowCreate(false)
       setNewTitle('')
-      router.push(`/room/${res.data!.id}`)
+      setIsScheduled(false)
+      setScheduleTime('')
+      setIsPublic(false)
+      if (!isScheduled) {
+        router.push(`/room/${res.data.id}`)
+      } else {
+        loadData()
+      }
     }
     setCreating(false)
+  }
+
+  const handleCopyInvite = (meetingId: string) => {
+    const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${meetingId}` : `/room/${meetingId}`
+    navigator.clipboard.writeText(inviteUrl)
+    setCopiedId(meetingId)
+    setTimeout(() => setCopiedId(null), 2000)
   }
 
   const formatDuration = (sec?: number) => {
@@ -176,6 +205,65 @@ export default function DashboardPage() {
           </section>
         )}
 
+        {/* Scheduled meetings */}
+        {scheduledMeetings.length > 0 && (
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <h2>Запланированные конференции</h2>
+              <div className={styles.scheduledIndicator} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--color-accent-amber)', fontWeight: 600 }}>
+                <CalendarClock size={16} />
+                <span>Ожидают начала</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {scheduledMeetings.map((m) => {
+                const isCopied = copiedId === m.id
+                return (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', justifyContent: 'space-between', transition: 'border-color var(--transition-fast)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flex: 1, minWidth: 0 }}>
+                      <div style={{ background: 'var(--color-accent-blue-dim)', color: 'var(--color-accent-blue)', width: 44, height: 44, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Calendar size={22} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.title}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Clock size={12} /> {formatDate(m.scheduledStart!)}
+                          </span>
+                          {m.isPublic && (
+                            <span className="badge badge-green" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Globe size={11} /> Публичная
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleCopyInvite(m.id)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        title="Скопировать ссылку-приглашение"
+                      >
+                        {isCopied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
+                        {isCopied ? 'Скопировано!' : 'Копировать ссылку'}
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => router.push(`/room/${m.id}`)}
+                      >
+                        <Zap size={14} /> Войти
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Past meetings */}
         {pastMeetings.length > 0 && (
           <section className={styles.section}>
@@ -208,7 +296,7 @@ export default function DashboardPage() {
       {/* Create meeting modal */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <h3 style={{ marginBottom: 'var(--space-4)' }}>Новая встреча</h3>
             <form onSubmit={handleCreate}>
               <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -224,8 +312,65 @@ export default function DashboardPage() {
                   onChange={(e) => setNewTitle(e.target.value)}
                   autoFocus
                   maxLength={200}
+                  required
                 />
               </div>
+
+              {/* Schedule meeting checkbox */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                <input
+                  id="schedule-toggle"
+                  type="checkbox"
+                  checked={isScheduled}
+                  onChange={(e) => {
+                    setIsScheduled(e.target.checked)
+                    if (e.target.checked && !scheduleTime) {
+                      const d = new Date()
+                      d.setHours(d.getHours() + 1)
+                      d.setMinutes(0)
+                      const offset = d.getTimezoneOffset()
+                      const localDate = new Date(d.getTime() - offset * 60 * 1000)
+                      setScheduleTime(localDate.toISOString().slice(0, 16))
+                    }
+                  }}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <label htmlFor="schedule-toggle" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                  Запланировать на определённое время
+                </label>
+              </div>
+
+              {/* Date & Time Picker */}
+              {isScheduled && (
+                <div style={{ marginBottom: 'var(--space-4)', animation: 'fade-up 0.2s ease' }}>
+                  <label className={styles.label} htmlFor="meeting-time">
+                    Дата и время начала
+                  </label>
+                  <input
+                    id="meeting-time"
+                    className="input-field"
+                    type="datetime-local"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    required={isScheduled}
+                  />
+                </div>
+              )}
+
+              {/* Public toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
+                <input
+                  id="public-toggle"
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <label htmlFor="public-toggle" style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)', cursor: 'pointer' }}>
+                  Публичная встреча (разрешить вход гостям без авторизации)
+                </label>
+              </div>
+
               <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowCreate(false)}>
                   Отмена
@@ -236,7 +381,7 @@ export default function DashboardPage() {
                   className="btn btn-primary"
                   disabled={!newTitle.trim() || creating}
                 >
-                  {creating ? 'Создание...' : 'Создать и войти'}
+                  {creating ? 'Создание...' : isScheduled ? 'Запланировать' : 'Создать и войти'}
                 </button>
               </div>
             </form>

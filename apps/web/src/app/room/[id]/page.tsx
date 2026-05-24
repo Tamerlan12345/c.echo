@@ -4,11 +4,13 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   LiveKitRoom,
-  VideoConference,
   useParticipants,
   useLocalParticipant,
   useRoomContext,
   RoomAudioRenderer,
+  GridLayout,
+  ParticipantTile,
+  useTracks,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { Track, RoomEvent } from 'livekit-client'
@@ -16,6 +18,7 @@ import {
   Mic, MicOff, Video, VideoOff, Monitor, Users,
   PhoneOff, Bot, Shield, CheckCircle2, XCircle,
   Circle, StopCircle, X, LogOut, MessageSquare, Send,
+  Globe, Copy, Check, Calendar, Lock
 } from 'lucide-react'
 import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
@@ -33,34 +36,188 @@ export default function RoomPage() {
   const [user, setUser] = useState<User | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function init() {
-      const [meRes, meetRes, tokenRes] = await Promise.all([
-        authApi.me(),
-        meetingsApi.get(id),
-        livekitApi.token(id),
-      ])
+  // Guest welcome screen states
+  const [showWelcome, setShowWelcome] = useState(false)
+  const [publicInfo, setPublicInfo] = useState<{ id: string; title: string; scheduledStart: string | null; isPublic: boolean; creatorName: string } | null>(null)
+  const [guestName, setGuestName] = useState('')
+  const [loggingInGuest, setLoggingInGuest] = useState(false)
+  const [copied, setCopied] = useState(false)
 
-      if ('error' in meRes) { setError('Не удалось загрузить профиль'); return }
-      if ('error' in meetRes) { setError(meetRes.error?.message ?? 'Встреча не найдена'); return }
-      if ('error' in tokenRes) { setError(tokenRes.error?.message ?? 'Ошибка подключения'); return }
+  const init = useCallback(async () => {
+    // 1. Try to load authenticated user profile
+    const meRes = await authApi.me()
 
-      setUser(meRes.data)
-      setMeeting(meetRes.data)
-      setToken(tokenRes.data.token)
-      setServerUrl(tokenRes.data.serverUrl)
+    if ('error' in meRes) {
+      // User is not authenticated. Check if meeting is public
+      const pubRes = await meetingsApi.getPublicInfo(id)
+      if ('data' in pubRes && pubRes.data && pubRes.data.isPublic) {
+        setPublicInfo(pubRes.data)
+        setShowWelcome(true)
+      } else {
+        setError('Для доступа к этой конференции требуется авторизация')
+      }
+      return
     }
-    init()
+
+    // 2. User is authenticated (or logged in as guest). Fetch meeting and LiveKit token.
+    const [meetRes, tokenRes] = await Promise.all([
+      meetingsApi.get(id),
+      livekitApi.token(id),
+    ])
+
+    if ('error' in meetRes) {
+      setError(meetRes.error?.message ?? 'Встреча не найдена')
+      return
+    }
+    if ('error' in tokenRes) {
+      setError(tokenRes.error?.message ?? 'Ошибка подключения')
+      return
+    }
+
+    setUser(meRes.data)
+    setMeeting(meetRes.data)
+    setToken(tokenRes.data.token)
+    setServerUrl(tokenRes.data.serverUrl)
+    setShowWelcome(false)
   }, [id])
+
+  useEffect(() => {
+    init()
+  }, [init])
+
+  const handleGuestJoin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!guestName.trim()) return
+    setLoggingInGuest(true)
+
+    const res = await authApi.guestLogin(guestName.trim())
+    if ('data' in res && res.data) {
+      await init()
+    } else {
+      setError('Не удалось подключиться в качестве гостя')
+    }
+    setLoggingInGuest(false)
+  }
+
+  const handleCopyLink = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   if (error) {
     return (
       <div className={styles.loadingRoom}>
         <XCircle size={48} color="var(--color-danger)" />
-        <p style={{ color: 'var(--color-danger)' }}>{error}</p>
-        <button className="btn btn-ghost" onClick={() => router.push('/dashboard')}>
+        <p style={{ color: 'var(--color-danger)', textAlign: 'center', marginTop: 16 }}>{error}</p>
+        <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={() => router.push('/dashboard')}>
           На главную
         </button>
+      </div>
+    )
+  }
+
+  if (showWelcome && publicInfo) {
+    return (
+      <div className={styles.welcomeLayout}>
+        <div className={styles.welcomeCard}>
+          <div className={styles.welcomeHeader}>
+            <div className={styles.welcomeLogo}>
+              <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
+                <defs>
+                  <linearGradient id="welcomeLogoGrad" x1="0" y1="0" x2="36" y2="36">
+                    <stop offset="0%" stopColor="#E50012"/>
+                    <stop offset="50%" stopColor="#8A005A"/>
+                    <stop offset="100%" stopColor="#0033A0"/>
+                  </linearGradient>
+                </defs>
+                <rect x="2" y="10" width="18" height="16" rx="4" fill="url(#welcomeLogoGrad)"/>
+                <path d="M20 14L27 10V26L20 22V14Z" fill="url(#welcomeLogoGrad)"/>
+                <path d="M31 13C32.5 15 32.5 21 31 23" stroke="url(#welcomeLogoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <h1 className={styles.welcomeTitle}>Подключение к конференции</h1>
+            <p className={styles.welcomeSubtitle}>Centras Echo · Безопасные видеоконференции</p>
+          </div>
+
+          <div className={styles.meetingInfoBox}>
+            <h2 className={styles.meetingInfoTitle}>{publicInfo.title}</h2>
+            
+            <div className={styles.meetingInfoRow}>
+              <span>Организатор:</span>
+              <span style={{ fontWeight: 600 }}>{publicInfo.creatorName ?? 'Система'}</span>
+            </div>
+
+            {publicInfo.scheduledStart && (
+              <div className={styles.meetingInfoRow}>
+                <span>Запланировано на:</span>
+                <span>
+                  {new Intl.DateTimeFormat('ru-RU', {
+                    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
+                  }).format(new Date(publicInfo.scheduledStart))}
+                </span>
+              </div>
+            )}
+
+            <div className={styles.meetingInfoRow}>
+              <span>Доступ:</span>
+              <span style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Globe size={12} /> Публичный (вход без авторизации)
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={handleGuestJoin} className={styles.guestForm}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label htmlFor="guest-name" style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                Представьтесь, чтобы войти в комнату:
+              </label>
+              <input
+                id="guest-name"
+                className="input-field"
+                type="text"
+                placeholder="Ваше имя"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                maxLength={60}
+                required
+                autoFocus
+              />
+            </div>
+
+            <button
+              id="guest-join-btn"
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '12px', fontSize: '0.9375rem' }}
+              disabled={!guestName.trim() || loggingInGuest}
+            >
+              {loggingInGuest ? 'Подключение…' : 'Присоединиться к конференции'}
+            </button>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={handleCopyLink}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                {copied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
+                {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => router.push('/login')}
+                style={{ flex: 1 }}
+              >
+                Войти через аккаунт
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     )
   }
@@ -114,6 +271,14 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   const allParticipants = localParticipant ? [localParticipant, ...remoteParticipants] : remoteParticipants
 
   const isHost = meeting.creatorId === user.id
+
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false },
+  )
 
   // UI state
   const [showSenti, setShowSenti] = useState(false)
@@ -180,6 +345,11 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
           if (!isHost) {
             setShowConsentModal(true)
           }
+        } else if (data.type === 'mute_participant') {
+          if (data.targetIdentity === localParticipant?.identity) {
+            localParticipant.setMicrophoneEnabled(false)
+            setMicEnabled(false)
+          }
         } else if (data.type === 'chat') {
           const newMsg: ChatMessage = {
             id: Math.random().toString(36).substr(2, 9),
@@ -200,7 +370,18 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     return () => {
       room.off(RoomEvent.DataReceived, handleDataReceived)
     }
-  }, [room, isHost, pollConsent, showChat])
+  }, [room, isHost, pollConsent, showChat, localParticipant])
+
+  const handleMuteParticipant = async (targetIdentity: string) => {
+    if (!localParticipant || !isHost) return
+    try {
+      const encoder = new TextEncoder()
+      const data = encoder.encode(JSON.stringify({ type: 'mute_participant', targetIdentity }))
+      await localParticipant.publishData(data, { reliable: true })
+    } catch (err) {
+      console.error('Failed to broadcast mute participant signal:', err)
+    }
+  }
 
   // Send message
   const sendMessage = async (e: React.FormEvent) => {
@@ -214,7 +395,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     setMessages((prev) => [...prev, {
       id: Math.random().toString(36).substr(2, 9),
       userId: localParticipant.identity,
-      userName: localParticipant.name || 'Вы',
+      userName: localParticipant.name || user.name || 'Вы',
       text: chatInput,
       timestamp: Date.now(),
     }])
@@ -349,10 +530,22 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                   )}
                 </div>
                 <div className={styles.participantIcons}>
-                  {isMuted
-                    ? <MicOff size={14} className={styles.mutedIcon} />
-                    : <Mic size={14} />
-                  }
+                  {isMuted ? (
+                    <MicOff size={14} className={styles.mutedIcon} />
+                  ) : (
+                    isHost && !p.isLocal ? (
+                      <button
+                        className={styles.muteActionBtn}
+                        onClick={() => handleMuteParticipant(p.identity)}
+                        title="Выключить микрофон участника"
+                        aria-label={`Выключить микрофон ${p.name ?? p.identity}`}
+                      >
+                        <Mic size={14} />
+                      </button>
+                    ) : (
+                      <Mic size={14} />
+                    )
+                  )}
                   {!camPub?.track && <VideoOff size={14} />}
                 </div>
               </div>
@@ -379,7 +572,9 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
         {/* LiveKit video grid */}
         <div className={styles.videoGrid}>
-          <VideoConference />
+          <GridLayout tracks={tracks} style={{ height: '100%' }}>
+            <ParticipantTile />
+          </GridLayout>
         </div>
 
         {/* Controls */}
@@ -525,9 +720,9 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                     key={m.id}
                     className={`${styles.chatMessage} ${isMine ? styles.chatMessageMine : styles.chatMessageOther}`}
                   >
-                    {!isMine && (
-                      <span className={styles.chatMessageSender}>{m.userName}</span>
-                    )}
+                    <span className={styles.chatMessageSender}>
+                      {m.userName} {isMine && ' (Вы)'}
+                    </span>
                     <div className={`${styles.chatBubble} ${isMine ? styles.chatBubbleMine : styles.chatBubbleOther}`}>
                       {m.text}
                     </div>

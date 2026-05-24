@@ -43,11 +43,17 @@ CREATE TABLE IF NOT EXISTS meetings (
     is_recorded   BOOLEAN DEFAULT FALSE,
     senti_status  TEXT DEFAULT 'none'
                   CHECK (senti_status IN ('none', 'processing', 'done', 'failed')),
-    summary       JSONB
+    summary       JSONB,
+    scheduled_start TIMESTAMPTZ,
+    is_public     BOOLEAN DEFAULT FALSE
 );
 
 CREATE INDEX IF NOT EXISTS idx_meetings_creator   ON meetings(creator_id);
 CREATE INDEX IF NOT EXISTS idx_meetings_created   ON meetings(created_at DESC);
+
+-- Ensure columns exist in case the table was already created
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS scheduled_start TIMESTAMPTZ;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;
 
 -- ─── Meeting Participants ─────────────────────────────────────────────────────
 

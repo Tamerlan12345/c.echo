@@ -4,14 +4,22 @@ import type { EncodedFileOutput } from 'livekit-server-sdk'
 import { pool } from '../db/pool.js'
 import { getActiveCount, getParticipantCount, MAX_PARTICIPANTS_PER_MEETING, MAX_ACTIVE_MEETINGS } from '../services/limits.js'
 
+const getLiveKitUrl = (): string => {
+  const url = process.env.LIVEKIT_URL || ''
+  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
+    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
+  }
+  return url
+}
+
 const getLiveKitClient = () => new RoomServiceClient(
-  process.env.LIVEKIT_URL!,
+  getLiveKitUrl(),
   process.env.LIVEKIT_API_KEY!,
   process.env.LIVEKIT_API_SECRET!,
 )
 
 const getEgressClient = () => new EgressClient(
-  process.env.LIVEKIT_URL!,
+  getLiveKitUrl(),
   process.env.LIVEKIT_API_KEY!,
   process.env.LIVEKIT_API_SECRET!,
 )
@@ -171,10 +179,6 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
       file: {
         filepath: outputPath,
         fileType: 4, // MP3
-        output: {
-          case: 'gcsUpload',
-          value: {} as any, // local file output via Volume mount
-        },
       } as any,
     })
 
