@@ -34,22 +34,23 @@ function clearTokens(): void {
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit = {},
+  options: RequestInit & { skipRedirect?: boolean } = {},
   retry = true,
 ): Promise<ApiResult<T>> {
+  const { skipRedirect = false, ...fetchOptions } = options
   const token = getAccessToken()
 
   const headers: Record<string, string> = {}
-  if (options.body !== undefined && !(options.body instanceof FormData)) {
+  if (fetchOptions.body !== undefined && !(fetchOptions.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json'
   }
-  Object.assign(headers, options.headers)
+  Object.assign(headers, fetchOptions.headers)
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
 
   // Auto-refresh on 401
   if (res.status === 401 && retry) {
@@ -59,7 +60,9 @@ async function apiFetch<T>(
     }
     // Refresh failed — redirect to login
     clearTokens()
-    window.location.href = '/login'
+    if (!skipRedirect) {
+      window.location.href = '/login'
+    }
     return { error: { code: 'UNAUTHORIZED', message: 'Session expired' } }
   }
 
@@ -95,7 +98,7 @@ async function tryRefresh(): Promise<boolean> {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  me: () => apiFetch<User>('/api/auth/me'),
+  me: (options?: RequestInit & { skipRedirect?: boolean }) => apiFetch<User>('/api/auth/me', options),
   logout: async () => {
     await apiFetch('/api/auth/logout', { method: 'POST' })
     clearTokens()

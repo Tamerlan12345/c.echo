@@ -45,7 +45,7 @@ export default function RoomPage() {
 
   const init = useCallback(async () => {
     // 1. Try to load authenticated user profile
-    const meRes = await authApi.me()
+    const meRes = await authApi.me({ skipRedirect: true })
 
     if ('error' in meRes) {
       // User is not authenticated. Check if meeting is public
