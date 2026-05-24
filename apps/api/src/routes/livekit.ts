@@ -195,7 +195,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
 
       return reply.send({ data: { recording: true, egressId: egress.egressId } })
     } catch (err: any) {
-      app.log.error({ err, meetingId }, 'Failed to start LiveKit egress')
+      app.log.error({ err, meetingId }, `Failed to start LiveKit egress: ${err.message} - ${err.stack}`)
       return reply.status(500).send({
         error: {
           code: 'EGRESS_START_FAILED',
@@ -230,7 +230,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
       const client = getEgressClient()
       await client.stopEgress(egressId)
     } catch (err: any) {
-      app.log.error({ err, egressId }, 'Failed to stop LiveKit egress')
+      app.log.error({ err, egressId }, `Failed to stop LiveKit egress: ${err.message} - ${err.stack}`)
       return reply.status(500).send({
         error: {
           code: 'EGRESS_STOP_FAILED',
