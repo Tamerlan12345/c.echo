@@ -52,9 +52,10 @@ function LoginContent() {
 
   return (
     <div className={styles.container}>
+      <div className={styles.glowBubble2} aria-hidden="true" />
       <div className={styles.card}>
         {/* Logo */}
-        <div className={styles.logoArea} style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-4) 0' }}>
+        <div className={styles.logoArea}>
           <img src="/logo.svg" alt="Centras.Echo" width="200" height="48" />
         </div>
 

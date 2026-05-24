@@ -136,6 +136,7 @@ export default function ProtocolPage() {
 
   const hasSenti = meeting.sentiStatus === 'done'
   const isProcessing = meeting.sentiStatus === 'processing'
+  const [exporting, setExporting] = useState(false)
 
   // Calculate metrics
   const totalPhrases = transcript.length
@@ -179,6 +180,75 @@ export default function ProtocolPage() {
       disabled: !hasSenti,
     },
   ]
+
+  const handleExportPDF = async () => {
+    if (exporting) return
+    setExporting(true)
+
+    try {
+      const { jsPDF } = await import('jspdf')
+      const html2canvas = (await import('html2canvas')).default
+
+      const element = document.querySelector(`.${styles.printOnlyContainer}`) as HTMLElement
+      if (!element) {
+        throw new Error('Печатная форма не найдена')
+      }
+
+      // Temporarily override display to render the print container
+      const originalDisplay = element.style.display
+      element.style.setProperty('display', 'block', 'important')
+      element.style.position = 'absolute'
+      element.style.left = '-9999px'
+      element.style.top = '0'
+      element.style.width = '800px'
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+
+      element.style.display = originalDisplay
+      element.style.position = ''
+      element.style.left = ''
+      element.style.top = ''
+      element.style.width = ''
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const imgWidth = 210
+      const pageHeight = 295
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+
+      let position = 0
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      const filename = `Protocol_${meeting.title.replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s]/g, '_')}.pdf`
+      pdf.save(filename)
+    } catch (error) {
+      console.error('Failed to export PDF:', error)
+      alert('Не удалось экспортировать PDF: ' + (error as Error).message)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className={`${styles.layout} fade-up`}>
@@ -228,11 +298,16 @@ export default function ProtocolPage() {
               <button
                 id="export-pdf-btn"
                 className="btn btn-ghost btn-sm"
-                onClick={() => window.print()}
+                onClick={handleExportPDF}
+                disabled={exporting}
                 style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <FileText size={14} />
-                Экспорт в PDF
+                {exporting ? (
+                  <span className={styles.spinner} style={{ width: 14, height: 14, borderWidth: 1.5, display: 'inline-block' }} />
+                ) : (
+                  <FileText size={14} />
+                )}
+                {exporting ? 'Экспорт…' : 'Экспорт в PDF'}
               </button>
             )}
           </div>
