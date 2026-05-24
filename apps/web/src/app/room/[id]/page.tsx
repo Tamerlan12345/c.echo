@@ -107,6 +107,8 @@ export default function RoomPage() {
       return
     }
 
+    setShowWelcome(false)
+
     // Check waiting room status
     const statusRes = await meetingsApi.getWaitingStatus(id)
     if ('data' in statusRes && statusRes.data) {
@@ -213,6 +215,9 @@ export default function RoomPage() {
 
     const res = await authApi.guestLogin(guestName.trim())
     if ('data' in res && res.data) {
+      // Instantly hide welcome screen so the user sees a transition (loading spinner)
+      // while init() resolves the actual destination (waiting room / room / error).
+      setShowWelcome(false)
       await init()
     } else {
       setError('Не удалось подключиться в качестве гостя')
@@ -221,8 +226,30 @@ export default function RoomPage() {
   }
 
   const handleCopyLink = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href)
+    if (typeof window !== 'undefined' && publicInfo) {
+      const inviteUrl = window.location.href
+      const creatorName = publicInfo.creatorName ?? 'Организатор'
+      const dateStr = publicInfo.scheduledStart
+        ? new Intl.DateTimeFormat('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            hour: '2-digit',
+            minute: '2-digit',
+          }).format(new Date(publicInfo.scheduledStart))
+        : null
+
+      const lines = [
+        `${creatorName} приглашает вас на видеоконференцию Centras Echo.`,
+        `Тема: ${publicInfo.title}`,
+        `Ссылка: ${inviteUrl}`,
+        `Доступ: ${publicInfo.isPublic ? 'Публичный (вход без авторизации)' : 'Приватный (требуется авторизация)'}`,
+      ]
+
+      if (dateStr) {
+        lines.push(`Время: ${dateStr}`)
+      }
+
+      navigator.clipboard.writeText(lines.join('\n'))
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -310,6 +337,46 @@ export default function RoomPage() {
                 <Globe size={12} /> Публичный (вход без авторизации)
               </span>
             </div>
+
+            <div style={{
+              marginTop: 'var(--space-4)',
+              paddingTop: 'var(--space-3)',
+              borderTop: '1px solid var(--color-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6
+            }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textAlign: 'left' }}>
+                Текст приглашения:
+              </span>
+              <textarea
+                className="input-field"
+                readOnly
+                value={(() => {
+                  const url = typeof window !== 'undefined' ? window.location.href : ''
+                  const creator = publicInfo.creatorName ?? 'Организатор'
+                  const date = publicInfo.scheduledStart
+                    ? new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(publicInfo.scheduledStart))
+                    : null
+                  return [
+                    `${creator} приглашает вас на видеоконференцию Centras Echo.`,
+                    `Тема: ${publicInfo.title}`,
+                    `Ссылка: ${url}`,
+                    `Доступ: ${publicInfo.isPublic ? 'Публичный (вход без авторизации)' : 'Приватный (требуется авторизация)'}`,
+                    ...(date ? [`Время: ${date}`] : [])
+                  ].join('\n')
+                })()}
+                style={{
+                  fontSize: '0.75rem',
+                  fontFamily: 'var(--font-mono)',
+                  height: 90,
+                  resize: 'none',
+                  background: 'var(--color-bg-primary)',
+                  color: 'var(--color-text-secondary)',
+                  padding: '8px'
+                }}
+              />
+            </div>
           </div>
 
           <form onSubmit={handleGuestJoin} className={styles.guestForm}>
@@ -348,7 +415,7 @@ export default function RoomPage() {
                 style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
               >
                 {copied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
-                {copied ? 'Ссылка скопирована' : 'Скопировать ссылку'}
+                {copied ? 'Приглашение скопировано' : 'Скопировать приглашение'}
               </button>
               <button
                 type="button"
@@ -484,6 +551,37 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   // UI state
   const [showSenti, setShowSenti] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [roomCopied, setRoomCopied] = useState(false)
+
+  const handleCopyRoomInvite = () => {
+    if (typeof window !== 'undefined') {
+      const inviteUrl = window.location.href
+      const creatorName = (meeting as any).creator?.name ?? (meeting.creatorId === user.id ? user.name : 'Организатор')
+      const dateStr = meeting.scheduledStart
+        ? new Intl.DateTimeFormat('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            hour: '2-digit',
+            minute: '2-digit',
+          }).format(new Date(meeting.scheduledStart))
+        : null
+
+      const lines = [
+        `${creatorName} приглашает вас на видеоконференцию Centras Echo.`,
+        `Тема: ${meeting.title}`,
+        `Ссылка: ${inviteUrl}`,
+        `Доступ: ${meeting.isPublic ? 'Публичный (вход без авторизации)' : 'Приватный (требуется авторизация)'}`,
+      ]
+
+      if (dateStr) {
+        lines.push(`Время: ${dateStr}`)
+      }
+
+      navigator.clipboard.writeText(lines.join('\n'))
+      setRoomCopied(true)
+      setTimeout(() => setRoomCopied(false), 2000)
+    }
+  }
   const [showParticipants, setShowParticipants] = useState(true)
   const [showConsentModal, setShowConsentModal] = useState(false)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
@@ -1129,7 +1227,19 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
       <div className={styles.videoArea}>
         {/* Header */}
         <div className={styles.videoHeader}>
-          <span className={styles.meetingTitle}>{meeting.title}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className={styles.meetingTitle}>{meeting.title}</span>
+            <button
+              id="copy-room-invite-btn"
+              className="btn btn-ghost btn-sm"
+              onClick={handleCopyRoomInvite}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', height: 'auto', fontSize: '0.75rem', borderColor: 'var(--color-border)' }}
+              title="Скопировать приглашение на встречу"
+            >
+              {roomCopied ? <Check size={12} color="var(--color-success)" /> : <Copy size={12} />}
+              {roomCopied ? 'Скопировано!' : 'Пригласить'}
+            </button>
+          </div>
           <div className={styles.meetingMeta}>
             {isRecording && (
               <span className={styles.recordingBadge}>

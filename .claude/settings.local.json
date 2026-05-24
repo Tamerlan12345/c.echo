@@ -11,7 +11,12 @@
       "Bash(Get-ChildItem -Path \"D:\\\\c.echo\" -Recurse -Directory)",
       "Bash(Select-Object -First 30 FullName)",
       "Bash(grep -v \"\\\\$[0-9]\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(git diff *)",
+      "Bash(findstr \":3000 :3001\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(findstr \"3000 3001\")"
     ]
   }
 }

@@ -89,10 +89,31 @@ export default function DashboardPage() {
     setCreating(false)
   }
 
-  const handleCopyInvite = (meetingId: string) => {
-    const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${meetingId}` : `/room/${meetingId}`
-    navigator.clipboard.writeText(inviteUrl)
-    setCopiedId(meetingId)
+  const handleCopyInvite = (meeting: Meeting) => {
+    const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/room/${meeting.id}` : `/room/${meeting.id}`
+    const creatorName = (meeting as any).creator?.name ?? user?.name ?? 'Организатор'
+    const dateStr = meeting.scheduledStart
+      ? new Intl.DateTimeFormat('ru-RU', {
+          day: 'numeric',
+          month: 'long',
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(new Date(meeting.scheduledStart))
+      : null
+
+    const lines = [
+      `${creatorName} приглашает вас на видеоконференцию Centras Echo.`,
+      `Тема: ${meeting.title}`,
+      `Ссылка: ${inviteUrl}`,
+      `Доступ: ${meeting.isPublic ? 'Публичный (вход без авторизации)' : 'Приватный (требуется авторизация)'}`,
+    ]
+
+    if (dateStr) {
+      lines.push(`Время: ${dateStr}`)
+    }
+
+    navigator.clipboard.writeText(lines.join('\n'))
+    setCopiedId(meeting.id)
     setTimeout(() => setCopiedId(null), 2000)
   }
 
@@ -225,6 +246,8 @@ export default function DashboardPage() {
                   isActive
                   onJoin={() => router.push(`/room/${m.id}`)}
                   formatDate={formatDate}
+                  onCopyInvite={() => handleCopyInvite(m)}
+                  copiedId={copiedId}
                 />
               ))}
             </div>
@@ -269,7 +292,7 @@ export default function DashboardPage() {
                     <div className={styles.scheduledActions}>
                       <button
                         className="btn btn-ghost btn-sm"
-                        onClick={() => handleCopyInvite(m.id)}
+                        onClick={() => handleCopyInvite(m)}
                         title="Скопировать ссылку-приглашение"
                       >
                         {isCopied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
@@ -442,10 +465,11 @@ function StatCard({ icon, label, value, accent }: {
   )
 }
 
-function MeetingCard({ meeting, isActive, onJoin, formatDate }: {
-  meeting: Meeting; isActive: boolean; onJoin: () => void; formatDate: (s: string) => string
+function MeetingCard({ meeting, isActive, onJoin, formatDate, onCopyInvite, copiedId }: {
+  meeting: Meeting; isActive: boolean; onJoin: () => void; formatDate: (s: string) => string; onCopyInvite: () => void; copiedId: string | null
 }) {
   const count = meeting.participants?.length ?? 0
+  const isCopied = copiedId === meeting.id
   return (
     <div className={styles.meetingCard}>
       <div className={styles.meetingCardTop}>
@@ -462,9 +486,26 @@ function MeetingCard({ meeting, isActive, onJoin, formatDate }: {
       <p className={styles.meetingMeta}>
         <Clock size={12} /> {meeting.scheduledStart ? `Начало: ${formatDate(meeting.scheduledStart)}` : formatDate(meeting.createdAt)}
       </p>
-      <button id={`join-meeting-${meeting.id}`} className="btn btn-primary" onClick={onJoin} style={{ width: '100%', marginTop: 'auto' }}>
-        <Zap size={16} /> Войти
-      </button>
+      
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'auto', width: '100%' }}>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={onCopyInvite}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.8125rem' }}
+          title="Скопировать приглашение"
+        >
+          {isCopied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
+          {isCopied ? 'Скопировано' : 'Пригласить'}
+        </button>
+        <button
+          id={`join-meeting-${meeting.id}`}
+          className="btn btn-primary btn-sm"
+          onClick={onJoin}
+          style={{ flex: 1 }}
+        >
+          <Zap size={14} /> Войти
+        </button>
+      </div>
     </div>
   )
 }
