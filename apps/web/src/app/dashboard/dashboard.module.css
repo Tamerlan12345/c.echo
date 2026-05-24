@@ -19,6 +19,7 @@
   box-shadow: var(--shadow-sm);
 }
 .sidebarLogo {
+  --logo-echo-color: #60a5fa;
   display: flex;
   align-items: center;
   justify-content: flex-start;
