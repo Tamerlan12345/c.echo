@@ -61,7 +61,7 @@ export const sentiRoutes: FastifyPluginAsync = async (app) => {
       .map((r) => `[${r.start_sec}s] ${r.speaker_name}: ${r.phrase}`)
       .join('\n')
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' })
 
     const prompt = `You are Senti, the corporate AI secretary for Centras.Echo.
 Answer the following question about the meeting transcript strictly based on what was said.

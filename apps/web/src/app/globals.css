@@ -292,12 +292,10 @@ code, pre {
   opacity: 0.4;
 }
 
-/* ─── Senti AI gradient text ─────────────────────────────────────────────────── */
+/* ─── Senti label ────────────────────────────────────────────────────────────── */
 .senti-text {
-  background: linear-gradient(90deg, var(--color-accent-amber), var(--color-accent-blue));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #C277AA;
+  font-weight: 500;
 }
 
 /* ─── Loading skeleton ───────────────────────────────────────────────────────── */

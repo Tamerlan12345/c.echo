@@ -52,11 +52,6 @@ function LoginContent() {
 
   return (
     <div className={styles.container}>
-      {/* Animated background orbs */}
-      <div className={styles.orb1} aria-hidden="true" />
-      <div className={styles.orb2} aria-hidden="true" />
-      <div className={styles.orb3} aria-hidden="true" />
-
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.logoArea} style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-4) 0' }}>

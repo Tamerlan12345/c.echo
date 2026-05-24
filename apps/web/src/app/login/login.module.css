@@ -9,36 +9,26 @@
   background: var(--color-bg-primary);
 }
 
-/* Animated background orbs */
-@keyframes orb-float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%       { transform: translate(30px, -20px) scale(1.08); }
-  66%       { transform: translate(-20px, 30px) scale(0.95); }
-}
-
-.orb1, .orb2, .orb3 {
+/* Dot-grid background */
+.container::before {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(138, 0, 90, 0.18) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.55;
   pointer-events: none;
 }
-.orb1 {
-  width: 520px; height: 520px;
-  top: -160px; left: -160px;
-  background: radial-gradient(circle, rgba(229, 0, 18, 0.16) 0%, transparent 70%);
-  animation: orb-float 12s ease-in-out infinite;
-}
-.orb2 {
-  width: 420px; height: 420px;
-  bottom: -110px; right: -110px;
-  background: radial-gradient(circle, rgba(138, 0, 90, 0.18) 0%, transparent 70%);
-  animation: orb-float 15s ease-in-out infinite reverse;
-}
-.orb3 {
-  width: 320px; height: 320px;
-  top: 50%; left: 60%;
-  background: radial-gradient(circle, rgba(0, 51, 160, 0.16) 0%, transparent 70%);
-  animation: orb-float 10s ease-in-out infinite 3s;
+
+/* Static corner gradient accents */
+.container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 55% 45% at 8% 0%,   rgba(229, 0, 18, 0.09)  0%, transparent 100%),
+    radial-gradient(ellipse 45% 40% at 92% 100%, rgba(0,  51, 160, 0.10) 0%, transparent 100%);
+  pointer-events: none;
 }
 
 /* Card */
@@ -185,10 +175,10 @@
   border-top: 1px solid var(--color-border);
 }
 .sentiDot {
-  width: 6px; height: 6px;
+  width: 5px; height: 5px;
   border-radius: 50%;
-  background: var(--color-accent-amber);
-  box-shadow: 0 0 8px var(--color-accent-amber);
+  background: var(--color-accent-blue);
+  box-shadow: 0 0 6px rgba(138, 0, 90, 0.55);
 }
 .sentiLabel {
   font-size: 0.8125rem;

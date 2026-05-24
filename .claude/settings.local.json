@@ -5,7 +5,9 @@
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
       "Bash(pnpm dev *)",
-      "Bash(pnpm exec *)"
+      "Bash(pnpm exec *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\c.echo\" -Depth 2)",
+      "WebSearch"
     ]
   }
 }
