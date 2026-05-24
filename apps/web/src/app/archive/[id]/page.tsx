@@ -35,6 +35,7 @@ export default function ProtocolPage() {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabId>('protocol')
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -137,7 +138,6 @@ export default function ProtocolPage() {
 
   const hasSenti = meeting.sentiStatus === 'done'
   const isProcessing = meeting.sentiStatus === 'processing'
-  const [exporting, setExporting] = useState(false)
 
   // Calculate metrics
   const totalPhrases = transcript.length
