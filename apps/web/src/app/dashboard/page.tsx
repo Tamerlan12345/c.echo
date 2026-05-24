@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { meetingsApi, authApi } from '@/lib/api'
 import type { Meeting, User } from '@centras/shared'
 import styles from './dashboard.module.css'
+import { Logo, LogoIcon } from '@/components/Logo'
 import {
   Video, Plus, Archive, Settings, LogOut, Users,
   Clock, Shield, ChevronRight, Zap,
@@ -118,7 +119,12 @@ export default function DashboardPage() {
       {/* Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
-          <LogoIcon />
+          <div className={styles.fullLogo}>
+            <Logo width={160} height={31} />
+          </div>
+          <div className={styles.iconLogo}>
+            <LogoIcon />
+          </div>
         </div>
 
         <nav className={styles.sidebarNav}>
@@ -150,11 +156,13 @@ export default function DashboardPage() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.greeting}>
-              Встречи
+              Привет, {user?.name?.split(' ')[0] ?? 'Сотрудник'}! 👋
             </h1>
             <p className={styles.date}>
-              {user?.name?.split(' ')[0] ? `${user?.name?.split(' ')[0]}, ` : ''}
-              {new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}
+              {(() => {
+                const dStr = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
+                return dStr.charAt(0).toUpperCase() + dStr.slice(1)
+              })()}
             </p>
           </div>
 
@@ -501,22 +509,7 @@ function SidebarItem({ icon, label, active, href }: {
   )
 }
 
-function LogoIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 36 36" fill="none" aria-label="Centras.Echo">
-      <defs>
-        <linearGradient id="dashLogoGrad" x1="0" y1="0" x2="36" y2="36">
-          <stop offset="0%" stopColor="#E50012"/>
-          <stop offset="50%" stopColor="#8A005A"/>
-          <stop offset="100%" stopColor="#0033A0"/>
-        </linearGradient>
-      </defs>
-      <rect x="2" y="10" width="18" height="16" rx="4" fill="url(#dashLogoGrad)"/>
-      <path d="M20 14L27 10V26L20 22V14Z" fill="url(#dashLogoGrad)"/>
-      <path d="M31 13C32.5 15 32.5 21 31 23" stroke="url(#dashLogoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
-    </svg>
-  )
-}
+
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (

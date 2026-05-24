@@ -11,6 +11,7 @@ import {
 import { authApi } from '@/lib/api'
 import type { User } from '@centras/shared'
 import styles from './settings.module.css'
+import { Logo, LogoIcon } from '@/components/Logo'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,7 +66,12 @@ export default function SettingsPage() {
       {/* Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
-          <LogoIcon />
+          <div className={styles.fullLogo}>
+            <Logo width={160} height={31} />
+          </div>
+          <div className={styles.iconLogo}>
+            <LogoIcon />
+          </div>
         </div>
         <nav className={styles.sidebarNav}>
           <SidebarItem icon={<Video size={20} />} label="Встречи" href="/dashboard" />
@@ -620,21 +626,4 @@ function SidebarItem({ icon, label, active, href }: {
   )
 }
 
-// ─── Logo ─────────────────────────────────────────────────────────────────────
 
-function LogoIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 36 36" fill="none" aria-label="Centras.Echo">
-      <defs>
-        <linearGradient id="settingsLogoGrad" x1="0" y1="0" x2="36" y2="36">
-          <stop offset="0%" stopColor="#E50012"/>
-          <stop offset="50%" stopColor="#8A005A"/>
-          <stop offset="100%" stopColor="#0033A0"/>
-        </linearGradient>
-      </defs>
-      <rect x="2" y="10" width="18" height="16" rx="4" fill="url(#settingsLogoGrad)"/>
-      <path d="M20 14L27 10V26L20 22V14Z" fill="url(#settingsLogoGrad)"/>
-      <path d="M31 13C32.5 15 32.5 21 31 23" stroke="url(#settingsLogoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
-    </svg>
-  )
-}

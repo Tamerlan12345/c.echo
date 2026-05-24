@@ -23,6 +23,7 @@ import {
 import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
 import styles from './room.module.css'
+import { Logo, LogoIcon } from '@/components/Logo'
 
 // ─── Connection Quality Indicator Component ───────────────────────────────────
 
@@ -87,6 +88,7 @@ export default function RoomPage() {
   const [copied, setCopied] = useState(false)
 
   const [isInWaitingRoom, setIsInWaitingRoom] = useState(false)
+  const [isEnded, setIsEnded] = useState(false)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const init = useCallback(async () => {
@@ -231,24 +233,46 @@ export default function RoomPage() {
     )
   }
 
+  if (isEnded) {
+    return (
+      <div className={styles.welcomeLayout}>
+        <div className={styles.welcomeCard} style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-8)' }}>
+          <div className={styles.welcomeLogo} style={{ marginBottom: 'var(--space-6)' }}>
+            <Logo width={220} height={42} />
+          </div>
+          <div style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: 'var(--color-success-dim)',
+            color: 'var(--color-success)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto var(--space-4)'
+          }}>
+            <CheckCircle2 size={28} />
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
+            Конференция завершена
+          </h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9375rem', lineHeight: 1.5, margin: 0 }}>
+            Вы успешно вышли из конференции.
+            <br />
+            Эту вкладку браузера можно закрыть.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (showWelcome && publicInfo) {
     return (
       <div className={styles.welcomeLayout}>
         <div className={styles.welcomeCard}>
           <div className={styles.welcomeHeader}>
             <div className={styles.welcomeLogo}>
-              <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
-                <defs>
-                  <linearGradient id="welcomeLogoGrad" x1="0" y1="0" x2="36" y2="36">
-                    <stop offset="0%" stopColor="#E50012"/>
-                    <stop offset="50%" stopColor="#8A005A"/>
-                    <stop offset="100%" stopColor="#0033A0"/>
-                  </linearGradient>
-                </defs>
-                <rect x="2" y="10" width="18" height="16" rx="4" fill="url(#welcomeLogoGrad)"/>
-                <path d="M20 14L27 10V26L20 22V14Z" fill="url(#welcomeLogoGrad)"/>
-                <path d="M31 13C32.5 15 32.5 21 31 23" stroke="url(#welcomeLogoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
+              <Logo width={220} height={42} />
             </div>
             <h1 className={styles.welcomeTitle}>Подключение к конференции</h1>
             <p className={styles.welcomeSubtitle}>Centras Echo · Безопасные видеоконференции</p>
@@ -340,18 +364,7 @@ export default function RoomPage() {
         <div className={styles.welcomeCard}>
           <div className={styles.welcomeHeader}>
             <div className={styles.welcomeLogo}>
-              <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
-                <defs>
-                  <linearGradient id="waitingLogoGrad" x1="0" y1="0" x2="36" y2="36">
-                    <stop offset="0%" stopColor="#E50012"/>
-                    <stop offset="50%" stopColor="#8A005A"/>
-                    <stop offset="100%" stopColor="#0033A0"/>
-                  </linearGradient>
-                </defs>
-                <rect x="2" y="10" width="18" height="16" rx="4" fill="url(#waitingLogoGrad)"/>
-                <path d="M20 14L27 10V26L20 22V14Z" fill="url(#waitingLogoGrad)"/>
-                <path d="M31 13C32.5 15 32.5 21 31 23" stroke="url(#waitingLogoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
+              <Logo width={220} height={42} />
             </div>
             <h1 className={styles.welcomeTitle}>Зал ожидания</h1>
             <p className={styles.welcomeSubtitle}>Centras Echo · Контроль доступа</p>
@@ -409,7 +422,17 @@ export default function RoomPage() {
       connect={true}
       video={true}
       audio={true}
-      onDisconnected={() => router.push('/dashboard')}
+      onDisconnected={() => {
+        const isGuest = user?.email.endsWith('@guest.centras-echo.local')
+        if (isGuest) {
+          setIsEnded(true)
+          sessionStorage.removeItem('centras_access')
+          localStorage.removeItem('centras_refresh')
+          document.cookie = 'centras_access=; path=/; max-age=0; SameSite=Lax; Secure'
+        } else {
+          router.push('/dashboard')
+        }
+      }}
       style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}
     >
       <RoomAudioRenderer />
@@ -980,16 +1003,23 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
     setIsRecording(false)
   }
 
+  // Leave call (just exit, don't end)
+  const handleLeaveCall = async () => {
+    if (isHost && isRecording) {
+      await livekitApi.stopRecording(meetingId)
+      await stopAndUploadRecording()
+    }
+    room.disconnect()
+    router.push('/dashboard')
+  }
+
   // End call
   const handleEndCall = async () => {
-    const isLastParticipant = allParticipants.length <= 1
-    if (isHost || isLastParticipant) {
-      if (isRecording) {
-        await livekitApi.stopRecording(meetingId)
-        await stopAndUploadRecording()
-      }
-      await meetingsApi.end(meetingId)
+    if (isRecording) {
+      await livekitApi.stopRecording(meetingId)
+      await stopAndUploadRecording()
     }
+    await meetingsApi.end(meetingId)
     room.disconnect()
     router.push('/dashboard')
   }
@@ -1251,11 +1281,17 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
             <button
               id="end-call-btn"
               className={styles.endCallBtn}
-              onClick={() => setShowEndConfirm(true)}
-              aria-label="Завершить звонок"
+              onClick={() => {
+                if (isHost) {
+                  setShowEndConfirm(true)
+                } else {
+                  handleLeaveCall()
+                }
+              }}
+              aria-label={isHost ? "Завершить звонок" : "Выйти из звонка"}
             >
-              <PhoneOff size={18} />
-              Завершить
+              {isHost ? <PhoneOff size={18} /> : <LogOut size={18} />}
+              {isHost ? 'Завершить' : 'Выйти'}
             </button>
           </div>
 
@@ -1557,44 +1593,50 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
       )}
 
       {/* ── End Call Confirm ── */}
-      {showEndConfirm && (() => {
-        const isLastParticipant = allParticipants.length <= 1
-        const willEndCall = isHost || isLastParticipant
-        return (
-          <div className="modal-overlay" onClick={() => setShowEndConfirm(false)}>
-            <div
-              className={`modal-content ${styles.endCallModal}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={styles.endCallIcon}>
-                <PhoneOff size={24} />
-              </div>
-              <h3 style={{ marginBottom: 'var(--space-2)' }}>
-                {willEndCall ? 'Завершить встречу?' : 'Покинуть встречу?'}
-              </h3>
-              <p style={{ marginBottom: 'var(--space-6)', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-                {willEndCall
-                  ? 'Встреча завершится и будет отмечена как выполненная. Senti сохранит протокол при наличии записи.'
-                  : 'Вы покинете комнату. Встреча продолжится для остальных участников.'
-                }
-              </p>
-              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
-                <button className="btn btn-ghost" onClick={() => setShowEndConfirm(false)}>
-                  Отмена
-                </button>
+      {showEndConfirm && (
+        <div className="modal-overlay" onClick={() => setShowEndConfirm(false)}>
+          <div
+            className={`modal-content ${styles.endCallModal}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 450 }}
+          >
+            <div className={styles.endCallIcon}>
+              <PhoneOff size={24} />
+            </div>
+            <h3 style={{ marginBottom: 'var(--space-2)' }}>
+              Завершить встречу или выйти?
+            </h3>
+            <p style={{ marginBottom: 'var(--space-6)', fontSize: '0.875rem', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
+              Как организатор, вы можете завершить встречу для всех участников (с сохранением протокола Senti) или просто выйти, оставив встречу активной для остальных.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', width: '100%' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <button
                   id="confirm-end-call-btn"
                   className="btn btn-danger"
+                  style={{ flex: 1, padding: '10px 12px', fontSize: '0.875rem' }}
                   onClick={handleEndCall}
                 >
-                  {willEndCall ? <PhoneOff size={16} /> : <LogOut size={16} />}
-                  {willEndCall ? 'Завершить для всех' : 'Покинуть'}
+                  <PhoneOff size={14} />
+                  Завершить для всех
+                </button>
+                <button
+                  id="confirm-leave-call-btn"
+                  className="btn btn-ghost"
+                  style={{ flex: 1, borderColor: 'var(--color-accent-blue)', color: 'var(--color-accent-blue)', padding: '10px 12px', fontSize: '0.875rem' }}
+                  onClick={handleLeaveCall}
+                >
+                  <LogOut size={14} />
+                  Просто выйти
                 </button>
               </div>
+              <button className="btn btn-ghost" style={{ marginTop: 'var(--space-2)', width: '100%' }} onClick={() => setShowEndConfirm(false)}>
+                Отмена
+              </button>
             </div>
           </div>
-        )
-      })()}
+        </div>
+      )}
     </div>
   )
 }

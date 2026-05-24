@@ -26,6 +26,12 @@
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-4);
 }
+.fullLogo {
+  display: block;
+}
+.iconLogo {
+  display: none;
+}
 .sidebarNav {
   display: flex;
   flex-direction: column;
@@ -401,6 +407,8 @@
   .statsRow { grid-template-columns: repeat(2, 1fr); }
   .sidebar { width: 64px; }
   .sidebarLogo { justify-content: center; padding: var(--space-3) 0 var(--space-5); }
+  .fullLogo { display: none; }
+  .iconLogo { display: block; }
   .sidebarItemLabel { display: none; }
   .sidebarUser { justify-content: center; }
 }

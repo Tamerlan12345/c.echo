@@ -27,6 +27,12 @@
   margin-bottom: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
+.fullLogo {
+  display: block;
+}
+.iconLogo {
+  display: none;
+}
 
 .sidebarNav {
   display: flex;
@@ -454,6 +460,8 @@
 @media (max-width: 1024px) {
   .sidebar { width: 64px; }
   .sidebarLogo { display: flex; justify-content: center; padding: var(--space-3) 0 var(--space-5); }
+  .fullLogo { display: none; }
+  .iconLogo { display: block; }
   .sidebarItemLabel { display: none; }
   .sidebarUser { justify-content: center; padding: var(--space-4) 0; }
 }
