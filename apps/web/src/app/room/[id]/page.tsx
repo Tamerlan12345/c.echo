@@ -437,7 +437,7 @@ interface ChatMessage {
 
 function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   const room = useRoomContext()
-  const remoteParticipants = useParticipants()
+  const remoteParticipants = useParticipants().filter((p) => !p.isLocal)
   const { localParticipant } = useLocalParticipant()
   const allParticipants = localParticipant ? [localParticipant, ...remoteParticipants] : remoteParticipants
 
@@ -1036,8 +1036,9 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
         <div className={styles.participantsList}>
           {allParticipants.map((p) => {
             const isSpeaking = p.isSpeaking
-            const initials = p.name
-              ? p.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
+            const displayName = p.isLocal ? (p.name || user.name || 'Вы') : (p.name || p.identity)
+            const initials = displayName && displayName !== 'unknown'
+              ? displayName.split(' ').filter(Boolean).map((n) => n[0]).slice(0, 2).join('').toUpperCase()
               : '??'
             const micPub = p.getTrackPublication(Track.Source.Microphone)
             const camPub = p.getTrackPublication(Track.Source.Camera)
@@ -1051,7 +1052,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
                 </div>
                 <div className={styles.participantInfo}>
                   <div className={styles.participantName}>
-                    {p.name ?? p.identity}
+                    {displayName}
                     {p.isLocal && ' (вы)'}
                   </div>
                   {p.identity === meeting.creatorId && (

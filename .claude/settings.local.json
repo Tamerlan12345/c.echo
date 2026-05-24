@@ -7,7 +7,11 @@
       "Bash(pnpm dev *)",
       "Bash(pnpm exec *)",
       "Bash(Get-ChildItem -Path \"d:\\\\c.echo\" -Depth 2)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(Get-ChildItem -Path \"D:\\\\c.echo\" -Recurse -Directory)",
+      "Bash(Select-Object -First 30 FullName)",
+      "Bash(grep -v \"\\\\$[0-9]\")",
+      "Bash(npx tsc *)"
     ]
   }
 }

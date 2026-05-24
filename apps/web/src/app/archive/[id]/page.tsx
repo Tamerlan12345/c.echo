@@ -512,9 +512,13 @@ function TranscriptTab({
   }, [search, doSearch])
 
   const highlight = (text: string, q: string) => {
-    if (!q.trim()) return text
-    const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-    return text.replace(regex, '<mark>$1</mark>')
+    const query = q.trim()
+    if (!query) return text
+    const splitRegex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const needle = query.toLowerCase()
+    return text.split(splitRegex).map((part, i) =>
+      part.toLowerCase() === needle ? <mark key={i}>{part}</mark> : part,
+    )
   }
 
   return (
@@ -554,12 +558,9 @@ function TranscriptTab({
               </span>
               <div className={styles.transcriptBody}>
                 <div className={styles.transcriptSpeaker}>{entry.speakerName}</div>
-                <div
-                  className={styles.transcriptPhrase}
-                  dangerouslySetInnerHTML={{
-                    __html: highlight(entry.phrase, search),
-                  }}
-                />
+                <div className={styles.transcriptPhrase}>
+                  {highlight(entry.phrase, search)}
+                </div>
               </div>
             </div>
           ))}

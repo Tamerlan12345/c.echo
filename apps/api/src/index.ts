@@ -30,16 +30,25 @@ await app.register(cors, {
   credentials: true,
 })
 
+const jwtSecret = process.env.JWT_SECRET
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error(
+    'JWT_SECRET environment variable is required and must be at least 32 characters long.',
+  )
+}
+
 await app.register(jwt, {
-  secret: process.env.JWT_SECRET ?? 'dev-secret-change-in-production',
+  secret: jwtSecret,
   sign: { expiresIn: '15m' },
 })
 
 app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     await request.jwtVerify()
-  } catch (err) {
-    reply.send(err)
+  } catch {
+    return reply
+      .status(401)
+      .send({ error: { code: 'UNAUTHORIZED', message: 'Authentication required' } })
   }
 })
 

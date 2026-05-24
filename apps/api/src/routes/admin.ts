@@ -17,17 +17,13 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
 
   // All admin routes require auth + admin role
   app.addHook('onRequest', async (request, reply) => {
-    try {
-      await app.authenticate(request, reply)
-      const user = request.user as { role: string }
-      if (user.role !== 'admin') {
-        return reply.status(403).send({
-          error: { code: 'FORBIDDEN', message: 'Admin access required' },
-        })
-      }
-    } catch {
-      return reply.status(401).send({
-        error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+    await app.authenticate(request, reply)
+    if (reply.sent) return // authenticate already emitted 401
+
+    const user = request.user as { role: string } | undefined
+    if (!user || user.role !== 'admin') {
+      return reply.status(403).send({
+        error: { code: 'FORBIDDEN', message: 'Admin access required' },
       })
     }
   })
