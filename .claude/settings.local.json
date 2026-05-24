@@ -19,7 +19,14 @@
       "Bash(findstr \"3000 3001\")",
       "Bash(findstr /R \"\\\\.tsx$ \\\\.ts$\")",
       "Bash(findstr /V \"node_modules .next\")",
-      "Bash(findstr \"apps/\")"
+      "Bash(findstr \"apps/\")",
+      "Bash(awk 'NR>=858 && NR<=1200 {print NR\":\"$0}' apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
+      "Bash(awk 'NR>=858 && NR<=1540' apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
+      "Bash(awk 'NR>=584 && NR<=720' apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
+      "Bash(awk 'NR>=73 && NR<=260' apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
+      "Bash(grep -nE \"^\\\\s{4,}.*use\\(State|Effect|Ref|Callback|Memo\\)\\\\b\" apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
+      "Bash(grep -nE \"^\\\\s{4,}.*use[A-Z]\" apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
+      "Bash(awk -F: '{print $1}')"
     ]
   }
 }

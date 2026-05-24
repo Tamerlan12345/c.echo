@@ -924,6 +924,10 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   // Video layout
   const [viewMode, setViewMode] = useState<'gallery' | 'speaker'>('gallery')
 
+  // Host moderation state
+  const [muteOnEntry, setMuteOnEntry] = useState<boolean>(meeting.muteOnEntry ?? false)
+  const [transferTarget, setTransferTarget] = useState<{ identity: string; name: string } | null>(null)
+
   // Waiting Room state for host
   const [waitingUsers, setWaitingUsers] = useState<any[]>([])
   const prevWaitingCountRef = useRef(0)
@@ -1120,7 +1124,6 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   }
 
   // Mute-on-entry toggle (host only). Local meeting state mirrors the server.
-  const [muteOnEntry, setMuteOnEntry] = useState<boolean>(meeting.muteOnEntry ?? false)
   const handleToggleMuteOnEntry = async () => {
     if (!isHost) return
     const next = !muteOnEntry
@@ -1132,8 +1135,6 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   }
 
   // Transfer-host: confirmation modal + API + DataChannel broadcast.
-  const [transferTarget, setTransferTarget] = useState<{ identity: string; name: string } | null>(null)
-
   const handleTransferHost = async () => {
     if (!isHost || !transferTarget || !localParticipant) return
     const newHostId = transferTarget.identity
