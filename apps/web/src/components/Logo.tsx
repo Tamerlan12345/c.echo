@@ -17,36 +17,51 @@ export function LogoIcon({ width = 32, height = 32 }: { width?: number; height?:
   )
 }
 
-export function Logo({ width = 250, height = 48 }: { width?: number | string; height?: number | string }) {
+export function Logo({ size = 32, centered = false }: { size?: number; centered?: boolean }) {
   return (
-    <svg viewBox="0 0 250 48" width={width} height={height} fill="none" aria-label="Centras.Echo">
-      <defs>
-        <linearGradient id="sharedLogoGrad" x1="0" y1="0" x2="250" y2="0" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#E50012"/>
-          <stop offset="40%"  stopColor="#8A005A"/>
-          <stop offset="100%" stopColor="#0033A0"/>
-        </linearGradient>
-        <filter id="sharedLogoShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.2"/>
-        </filter>
-      </defs>
-
-      <g transform="translate(8, 9)" filter="url(#sharedLogoShadow)">
-        <rect x="0" y="6" width="14" height="18" rx="3.5" fill="url(#sharedLogoGrad)"/>
-        <line x1="3"  y1="11" x2="11" y2="11" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/>
-        <line x1="3"  y1="15" x2="11" y2="15" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/>
-        <line x1="3"  y1="19" x2="11" y2="19" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/>
-        <path d="M14 10 L20 7 L20 23 L14 20Z" fill="url(#sharedLogoGrad)"/>
-        <path d="M23 12 C24.5 13.5 24.5 16.5 23 18" stroke="url(#sharedLogoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
-        <path d="M27 10 C30 12.5 30 17.5 27 20" stroke="url(#sharedLogoGrad)" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.8"/>
-        <path d="M31 8 C35 11.5 35 18.5 31 22" stroke="url(#sharedLogoGrad)" strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.5"/>
-      </g>
-
-      <text x="52" y="32" fontFamily="'Outfit', 'Inter', sans-serif" fontSize="22" letterSpacing="0.020em">
-        <tspan fontWeight="900" fill="url(#sharedLogoGrad)">centras</tspan>
-        <tspan fontWeight="600" fill="#8A005A" fillOpacity="0.95" dx="5">·</tspan>
-        <tspan fontWeight="500" fill="var(--logo-echo-color, #0033A0)" dx="4">echo</tspan>
-      </text>
-    </svg>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      justifyContent: centered ? 'center' : 'flex-start',
+      width: centered ? '100%' : 'auto'
+    }}>
+      <LogoIcon width={size} height={size} />
+      <span style={{
+        fontFamily: "'Outfit', 'Inter', sans-serif",
+        fontSize: `${size * 0.68}px`,
+        letterSpacing: '0.020em',
+        display: 'flex',
+        alignItems: 'center',
+        userSelect: 'none',
+        lineHeight: 1
+      }}>
+        <span style={{
+          fontWeight: 900,
+          background: 'linear-gradient(135deg, #E50012 0%, #8A005A 50%, #0033A0 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          paddingBottom: '2px'
+        }}>
+          centras
+        </span>
+        <span style={{
+          fontWeight: 600,
+          color: '#8A005A',
+          opacity: 0.95,
+          margin: '0 4px',
+          paddingBottom: '2px'
+        }}>
+          ·
+        </span>
+        <span style={{
+          fontWeight: 500,
+          color: 'var(--logo-echo-color, #0033A0)',
+          paddingBottom: '2px'
+        }}>
+          echo
+        </span>
+      </span>
+    </div>
   )
 }

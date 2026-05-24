@@ -67,7 +67,7 @@ export default function SettingsPage() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
           <div className={styles.fullLogo}>
-            <Logo width={160} height={31} />
+            <Logo size={26} />
           </div>
           <div className={styles.iconLogo}>
             <LogoIcon />

@@ -851,6 +851,7 @@
 }
 
 .welcomeCard {
+  --logo-echo-color: #60a5fa;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
@@ -869,6 +870,8 @@
 .welcomeLogo {
   display: flex;
   justify-content: center;
+  align-items: center;
+  width: 100%;
   margin-bottom: var(--space-4);
 }
 

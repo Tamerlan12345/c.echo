@@ -57,7 +57,7 @@ function LoginContent() {
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.logoArea}>
-          <Logo width={300} height={58} />
+          <Logo size={36} centered />
         </div>
 
         <div className={styles.divider} />

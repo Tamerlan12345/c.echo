@@ -140,7 +140,14 @@ export default function RoomPage() {
       }
     }
 
-    // 2. User is authenticated (or logged in as guest). Fetch meeting and LiveKit token.
+    // 2. User is authenticated (or logged in as guest). Join the meeting first to ensure access in DB.
+    const joinRes = await meetingsApi.join(id)
+    if ('error' in joinRes) {
+      setError(joinRes.error?.message ?? 'Не удалось присоединиться к конференции')
+      return
+    }
+
+    // 3. Fetch meeting details and LiveKit token.
     const [meetRes, tokenRes] = await Promise.all([
       meetingsApi.get(id),
       livekitApi.token(id),
@@ -238,7 +245,7 @@ export default function RoomPage() {
       <div className={styles.welcomeLayout}>
         <div className={styles.welcomeCard} style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-8)' }}>
           <div className={styles.welcomeLogo} style={{ marginBottom: 'var(--space-6)' }}>
-            <Logo width={220} height={42} />
+            <Logo size={42} centered />
           </div>
           <div style={{
             width: 56,
@@ -272,7 +279,7 @@ export default function RoomPage() {
         <div className={styles.welcomeCard}>
           <div className={styles.welcomeHeader}>
             <div className={styles.welcomeLogo}>
-              <Logo width={220} height={42} />
+              <Logo size={42} centered />
             </div>
             <h1 className={styles.welcomeTitle}>Подключение к конференции</h1>
             <p className={styles.welcomeSubtitle}>Centras Echo · Безопасные видеоконференции</p>
@@ -364,7 +371,7 @@ export default function RoomPage() {
         <div className={styles.welcomeCard}>
           <div className={styles.welcomeHeader}>
             <div className={styles.welcomeLogo}>
-              <Logo width={220} height={42} />
+              <Logo size={42} centered />
             </div>
             <h1 className={styles.welcomeTitle}>Зал ожидания</h1>
             <p className={styles.welcomeSubtitle}>Centras Echo · Контроль доступа</p>
