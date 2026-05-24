@@ -70,7 +70,7 @@ export async function runSentiPipeline(meetingId: string, audioPath: string): Pr
   const safeNames = participantNames.map(maskPII)
 
   // 4. Upload to Gemini Files API and run inference
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
   const systemPrompt = buildSentiPrompt(safeNames)
   let sentiOutput: SentiOutput | null = null
