@@ -56,7 +56,7 @@ function LoginContent() {
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.logoArea}>
-          <img src="/logo.svg" alt="Centras.Echo" width="200" height="48" />
+          <Logo width={250} height={48} />
         </div>
 
         <div className={styles.divider} />
@@ -108,6 +108,40 @@ function LoginContent() {
         </div>
       </div>
     </div>
+  )
+}
+
+function Logo({ width = 250, height = 48 }: { width?: number | string; height?: number | string }) {
+  return (
+    <svg viewBox="0 0 250 48" width={width} height={height} fill="none" aria-label="Centras.Echo">
+      <defs>
+        <linearGradient id="logoGrad" x1="0" y1="0" x2="250" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#E50012"/>
+          <stop offset="40%"  stopColor="#8A005A"/>
+          <stop offset="100%" stopColor="#0033A0"/>
+        </linearGradient>
+        <filter id="logoShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.2"/>
+        </filter>
+      </defs>
+
+      <g transform="translate(8, 9)" filter="url(#logoShadow)">
+        <rect x="0" y="6" width="14" height="18" rx="3.5" fill="url(#logoGrad)"/>
+        <line x1="3"  y1="11" x2="11" y2="11" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/>
+        <line x1="3"  y1="15" x2="11" y2="15" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/>
+        <line x1="3"  y1="19" x2="11" y2="19" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.45"/>
+        <path d="M14 10 L20 7 L20 23 L14 20Z" fill="url(#logoGrad)"/>
+        <path d="M23 12 C24.5 13.5 24.5 16.5 23 18" stroke="url(#logoGrad)" strokeWidth="2.5" strokeLinecap="round"/>
+        <path d="M27 10 C30 12.5 30 17.5 27 20" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.8"/>
+        <path d="M31 8 C35 11.5 35 18.5 31 22" stroke="url(#logoGrad)" strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.5"/>
+      </g>
+
+      <text x="52" y="32" fontFamily="'Outfit', 'Inter', sans-serif" fontSize="22" letterSpacing="0.020em">
+        <tspan fontWeight="900" fill="url(#logoGrad)">centras</tspan>
+        <tspan fontWeight="600" fill="#8A005A" fillOpacity="0.95" dx="5">·</tspan>
+        <tspan fontWeight="500" fill="var(--logo-echo-color, #0033A0)" dx="4">echo</tspan>
+      </text>
+    </svg>
   )
 }
 

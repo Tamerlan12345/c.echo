@@ -7,9 +7,9 @@
   position: relative;
   overflow: hidden;
   background: 
-    radial-gradient(circle at 15% 15%, rgba(0, 51, 160, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 85% 85%, rgba(229, 0, 18, 0.06) 0%, transparent 40%),
-    linear-gradient(135deg, #F0F4F8 0%, #D9E2EC 100%);
+    radial-gradient(circle at 15% 15%, rgba(0, 51, 160, 0.16) 0%, transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(229, 0, 18, 0.12) 0%, transparent 45%),
+    linear-gradient(135deg, #0A0F1D 0%, #070A13 100%);
 }
 
 .container::before {
@@ -25,45 +25,46 @@
 .container::after {
   content: '';
   position: absolute;
-  width: 450px;
-  height: 450px;
-  background: radial-gradient(circle, rgba(0, 51, 160, 0.12) 0%, transparent 70%);
-  top: 15%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(0, 51, 160, 0.2) 0%, transparent 70%);
+  top: 10%;
   left: 20%;
   z-index: 0;
   pointer-events: none;
-  filter: blur(50px);
+  filter: blur(60px);
 }
 
 /* Second glowing bubble for premium background depth */
 .glowBubble2 {
   position: absolute;
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(229, 0, 18, 0.08) 0%, transparent 70%);
-  bottom: 10%;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(229, 0, 18, 0.14) 0%, transparent 70%);
+  bottom: 5%;
   right: 15%;
   z-index: 0;
   pointer-events: none;
-  filter: blur(50px);
+  filter: blur(60px);
 }
 
-/* Card */
+/* Card - styled as premium dark glassmorphism */
 .card {
+  --logo-echo-color: #60a5fa; /* Override color for inline logo */
   position: relative;
   z-index: 1;
   width: 100%;
   max-width: 420px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-xl);
   padding: var(--space-8);
   box-shadow: 
-    0 20px 40px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.02),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    0 25px 50px -12px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   animation: fade-up 0.5s ease both;
 }
 
@@ -79,27 +80,11 @@
 .logoArea:hover {
   transform: scale(1.03);
 }
-.logoIcon {
-  flex-shrink: 0;
-}
-.logoTitle {
-  font-size: 1.625rem;
-  font-weight: 800;
-  color: var(--color-text-primary);
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-.logoDot { color: var(--color-accent-blue); }
-.logoSub {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  margin-top: 3px;
-}
 
 /* Divider */
 .divider {
   height: 1px;
-  background: var(--color-border);
+  background: rgba(255, 255, 255, 0.08);
   margin-bottom: var(--space-6);
 }
 
@@ -109,17 +94,22 @@
 .heading {
   font-size: 1.375rem;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: #FFFFFF;
   line-height: 1.3;
   text-align: center;
 }
 
 .description {
   font-size: 0.9375rem;
-  color: var(--color-text-muted);
+  color: #94A3B8;
   line-height: 1.6;
   margin: 0;
   text-align: center;
+}
+
+/* Override Senti text colors in dark mode for contrast */
+.content :global(.senti-text) {
+  color: #60a5fa !important;
 }
 
 /* Error banner */
@@ -128,10 +118,10 @@
   align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  background: var(--color-danger-dim);
-  border: 1px solid rgba(255, 71, 87, 0.3);
+  background: rgba(217, 45, 32, 0.15);
+  border: 1px solid rgba(217, 45, 32, 0.3);
   border-radius: var(--radius-md);
-  color: var(--color-danger);
+  color: #FCA5A5;
   font-size: 0.875rem;
   line-height: 1.5;
 }
@@ -146,14 +136,14 @@
   width: 100%;
   padding: 13px 20px;
   background: #FFFFFF;
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
-  color: var(--color-text-primary);
+  color: #0F172A;
   font-family: var(--font-primary);
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
@@ -161,9 +151,9 @@
     transform var(--transition-fast);
 }
 .googleBtn:hover:not(:disabled) {
-  background: var(--color-bg-primary);
-  border-color: var(--color-accent-blue);
-  box-shadow: 0 4px 12px rgba(0, 51, 160, 0.08);
+  background: #F1F5F9;
+  border-color: #60A5FA;
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.25);
   transform: translateY(-1px);
 }
 .googleBtn:active:not(:disabled) { transform: scale(0.98); }
@@ -173,8 +163,8 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
   width: 20px; height: 20px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-accent-blue);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #60A5FA;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
@@ -183,12 +173,13 @@
 /* Hint */
 .hint {
   font-size: 0.8125rem;
-  color: var(--color-text-muted);
+  color: #64748B;
   text-align: center;
   line-height: 1.6;
   margin: 0;
 }
-.hint a { color: var(--color-accent-blue); }
+.hint a { color: #60A5FA; font-weight: 500; }
+.hint a:hover { text-decoration: underline; opacity: 0.9; }
 
 /* Senti footer */
 .sentiFooter {
@@ -198,7 +189,10 @@
   gap: var(--space-2);
   margin-top: var(--space-6);
   padding-top: var(--space-6);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sentiFooter :global(.senti-text) {
+  color: #60a5fa !important;
 }
 .sentiDot {
   width: 5px; height: 5px;
@@ -207,5 +201,5 @@
 }
 .sentiLabel {
   font-size: 0.8125rem;
-  color: var(--color-text-muted);
+  color: #64748B;
 }
