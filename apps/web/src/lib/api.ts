@@ -70,29 +70,41 @@ async function apiFetch<T>(
   return data as ApiResult<T>
 }
 
+let activeRefreshPromise: Promise<boolean> | null = null
+
 async function tryRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) return false
-
-  try {
-    const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    })
-
-    if (!res.ok) return false
-
-    const data = await res.json()
-    if (data.data?.accessToken) {
-      setTokens(data.data.accessToken, data.data.refreshToken)
-      return true
-    }
-  } catch {
-    return false
+  if (activeRefreshPromise) {
+    return activeRefreshPromise
   }
 
-  return false
+  activeRefreshPromise = (async () => {
+    const refreshToken = getRefreshToken()
+    if (!refreshToken) return false
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+
+      if (!res.ok) return false
+
+      const data = await res.json()
+      if (data.data?.accessToken) {
+        setTokens(data.data.accessToken, data.data.refreshToken)
+        return true
+      }
+    } catch {
+      return false
+    } finally {
+      activeRefreshPromise = null
+    }
+
+    return false
+  })()
+
+  return activeRefreshPromise
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────

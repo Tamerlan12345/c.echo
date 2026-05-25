@@ -916,6 +916,20 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
+  // Audio playback permission check (browser autoplay policy)
+  const [audioPlaybackAllowed, setAudioPlaybackAllowed] = useState(room.canPlaybackAudio)
+
+  useEffect(() => {
+    const handleAudioPlaybackChanged = (allowed: boolean) => {
+      setAudioPlaybackAllowed(allowed)
+    }
+    room.on(RoomEvent.AudioPlaybackStatusChanged, handleAudioPlaybackChanged)
+    setAudioPlaybackAllowed(room.canPlaybackAudio)
+    return () => {
+      room.off(RoomEvent.AudioPlaybackStatusChanged, handleAudioPlaybackChanged)
+    }
+  }, [room])
+
   // Reactions + Raise Hand states
   const [raisedHands, setRaisedHands] = useState<Record<string, boolean>>({})
   const [floatingReactions, setFloatingReactions] = useState<Array<{ id: string; identity: string; emoji: string }>>([])
@@ -1683,6 +1697,24 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
             <span className={styles.timer}>{formatTimer(elapsed)}</span>
           </div>
         </div>
+
+        {!audioPlaybackAllowed && (
+          <div className={styles.audioBlockedBanner}>
+            <div className={styles.audioBlockedContent}>
+              <VolumeX size={18} className={styles.audioBlockedIcon} />
+              <span>Звук встречи заблокирован вашим браузером. Нажмите кнопку, чтобы включить звук.</span>
+            </div>
+            <button className={styles.audioBlockedBtn} onClick={async () => {
+              try {
+                await room.startAudio()
+              } catch (e) {
+                console.error("Failed to start audio playback:", e)
+              }
+            }}>
+              Включить звук
+            </button>
+          </div>
+        )}
 
         {/* LiveKit video grid */}
         <div className={styles.videoGrid}>
