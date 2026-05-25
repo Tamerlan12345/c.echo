@@ -70,7 +70,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
 
     // Load meeting
     const meetingResult = await pool.query(
-      'SELECT id, livekit_room, ended_at, creator_id, COALESCE(host_id, creator_id) AS host_id, waiting_room_enabled FROM meetings WHERE id = $1',
+      'SELECT id, livekit_room, ended_at, creator_id, COALESCE(host_id, creator_id) AS host_id, waiting_room_enabled, is_public FROM meetings WHERE id = $1',
       [meetingId],
     )
     const meeting = meetingResult.rows[0]
@@ -79,6 +79,14 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     }
     if (meeting.ended_at) {
       return reply.status(400).send({ error: { code: 'MEETING_ENDED', message: 'Meeting has ended' } })
+    }
+
+    // Enforce guest check for private meetings
+    const isGuest = user.email?.endsWith('@guest.centras-echo.local') ?? false
+    if (!meeting.is_public && isGuest) {
+      return reply.status(403).send({
+        error: { code: 'FORBIDDEN', message: 'Гостям запрещен доступ к приватным встречам' }
+      })
     }
 
     // Enforce waiting room check for non-hosts

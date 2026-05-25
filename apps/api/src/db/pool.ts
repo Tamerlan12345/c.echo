@@ -35,3 +35,22 @@ export const pool = new Pool({
 pool.on('error', (err) => {
   console.error('Unexpected PostgreSQL pool error:', err)
 })
+
+export async function runWithUser<T>(
+  userId: string,
+  fn: (client: pg.PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query("SET LOCAL app.current_user_id = $1", [userId])
+    const res = await fn(client)
+    await client.query('COMMIT')
+    return res
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}

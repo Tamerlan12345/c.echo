@@ -1,10 +1,12 @@
 import { readFileSync, unlinkSync, existsSync } from 'fs'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleAIFileManager } from '@google/generative-ai/server'
 import { z } from 'zod'
 import { pool } from '../db/pool.js'
 import { maskPII } from './masking.js'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY!)
 
 // ─── Zod schema for Senti output validation ───────────────────────────────────
 
@@ -59,49 +61,71 @@ export async function runSentiPipeline(meetingId: string, audioPath: string): Pr
   )
   const participantNames = participantsResult.rows.map((r) => r.name)
 
-  // 2. Read audio file from Railway Volume
+  // 2. Check audio file exists
   if (!existsSync(audioPath)) {
     throw new Error(`Audio file not found: ${audioPath}`)
   }
-  const audioBuffer = readFileSync(audioPath)
-  const audioBase64 = audioBuffer.toString('base64')
 
   // 3. Mask PII in participant names before sending (extra precaution)
   const safeNames = participantNames.map(maskPII)
 
   // 4. Upload to Gemini Files API and run inference
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' })
+  const uploadResult = await fileManager.uploadFile(audioPath, {
+    mimeType: getMimeTypeFromPath(audioPath),
+    displayName: `Meeting Audio ${meetingId}`,
+  })
 
-  const systemPrompt = buildSentiPrompt(safeNames)
   let sentiOutput: SentiOutput | null = null
   let lastError: Error | null = null
 
-  // Retry up to 3 times if JSON is malformed
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            mimeType: getMimeTypeFromPath(audioPath),
-            data: audioBase64,
+  try {
+    // Poll until file is active
+    let fileState = await fileManager.getFile(uploadResult.file.name)
+    while (fileState.state === 'PROCESSING') {
+      await sleep(2000)
+      fileState = await fileManager.getFile(uploadResult.file.name)
+    }
+    if (fileState.state !== 'ACTIVE') {
+      throw new Error(`Google AI File processing failed with state: ${fileState.state}`)
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' })
+    const systemPrompt = buildSentiPrompt(safeNames)
+
+    // Retry up to 3 times if JSON is malformed
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await model.generateContent([
+          {
+            fileData: {
+              mimeType: uploadResult.file.mimeType,
+              fileUri: uploadResult.file.uri,
+            },
           },
-        },
-        systemPrompt,
-      ])
+          systemPrompt,
+        ])
 
-      const rawText = result.response.text()
+        const rawText = result.response.text()
 
-      // Extract JSON from response (Gemini sometimes wraps in markdown)
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON found in Gemini response')
+        // Extract JSON from response (Gemini sometimes wraps in markdown)
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) throw new Error('No JSON found in Gemini response')
 
-      const parsed = JSON.parse(jsonMatch[0])
-      sentiOutput = SentiOutputSchema.parse(parsed)
-      break
+        const parsed = JSON.parse(jsonMatch[0])
+        sentiOutput = SentiOutputSchema.parse(parsed)
+        break
+      } catch (err) {
+        lastError = err as Error
+        console.warn(`Senti attempt ${attempt}/3 failed:`, lastError.message)
+        await sleep(2000 * attempt)
+      }
+    }
+  } finally {
+    // Clean up file from Google Generative AI Files API
+    try {
+      await fileManager.deleteFile(uploadResult.file.name)
     } catch (err) {
-      lastError = err as Error
-      console.warn(`Senti attempt ${attempt}/3 failed:`, lastError.message)
-      await sleep(2000 * attempt)
+      console.warn(`Could not delete file from Google AI: ${uploadResult.file.name}`, err)
     }
   }
 

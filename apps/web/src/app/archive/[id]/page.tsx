@@ -664,7 +664,12 @@ function ChatTab({ meetingId }: { meetingId: string }) {
     setInput('')
     setLoading(true)
 
-    const res = await sentiApi.chat(meetingId, q)
+    const history = messages
+      .filter((m) => m.id !== 'intro')
+      .map((m) => ({ role: m.role, text: m.text }))
+      .slice(-10)
+
+    const res = await sentiApi.chat(meetingId, q, history)
     setLoading(false)
 
     if ('data' in res && res.data) {
@@ -813,8 +818,11 @@ function NoSentiState({ isProcessing, onUpload }: { isProcessing: boolean; onUpl
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.type !== 'audio/mpeg' && !file.name.endsWith('.mp3')) {
-      setError('Пожалуйста, выберите файл в формате MP3')
+    const allowedExtensions = ['.mp3', '.webm', '.ogg', '.wav', '.aac', '.m4a', '.mp4']
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+
+    if (!allowedExtensions.includes(ext)) {
+      setError('Выберите поддерживаемый аудиофайл (MP3, WebM, Ogg, WAV, AAC, M4A)')
       return
     }
 
@@ -856,10 +864,10 @@ function NoSentiState({ isProcessing, onUpload }: { isProcessing: boolean; onUpl
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)' }}>
         <label className="btn btn-amber btn-sm" style={{ cursor: 'pointer' }}>
-          {uploading ? 'Загрузка...' : 'Загрузить запись (.mp3)'}
+          {uploading ? 'Загрузка...' : 'Загрузить запись (MP3, WebM, Ogg, WAV, M4A)'}
           <input
             type="file"
-            accept="audio/mp3,audio/mpeg"
+            accept="audio/mp3,audio/mpeg,audio/webm,audio/ogg,audio/wav,audio/aac,audio/x-m4a,video/mp4"
             style={{ display: 'none' }}
             onChange={handleFileChange}
             disabled={uploading}

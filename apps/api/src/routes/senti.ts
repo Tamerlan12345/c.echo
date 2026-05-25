@@ -9,6 +9,10 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 const ChatSchema = z.object({
   meetingId: z.string().uuid(),
   question: z.string().min(2).max(500),
+  history: z.array(z.object({
+    role: z.enum(['user', 'senti', 'model']),
+    text: z.string(),
+  })).optional(),
 })
 
 export const sentiRoutes: FastifyPluginAsync = async (app) => {
@@ -24,7 +28,7 @@ export const sentiRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: body.error.message } })
     }
 
-    const { meetingId, question } = body.data
+    const { meetingId, question, history } = body.data
 
     // Verify access (participant or creator)
     const access = await pool.query(
@@ -61,6 +65,13 @@ export const sentiRoutes: FastifyPluginAsync = async (app) => {
       .map((r) => `[${r.start_sec}s] ${r.speaker_name}: ${r.phrase}`)
       .join('\n')
 
+    let historyText = ''
+    if (history && history.length > 0) {
+      historyText = 'Previous conversation history:\n' + history
+        .map((h) => `${h.role === 'user' ? 'User' : 'Senti'}: ${h.text}`)
+        .join('\n') + '\n\n'
+    }
+
     const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' })
 
     const prompt = `You are Senti, the corporate AI secretary for Centras.Echo.
@@ -70,7 +81,7 @@ Do not add interpretations or information not present in the transcript.
 MEETING TRANSCRIPT:
 ${transcriptText}
 
-QUESTION: ${maskPII(question)}
+${historyText}QUESTION: ${maskPII(question)}
 
 Respond in JSON:
 {

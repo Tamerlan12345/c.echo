@@ -34,6 +34,14 @@ export const limitsRoutes: FastifyPluginAsync = async (app) => {
 
 // System-wide active meetings check (for global limit)
 export async function getActiveCount(): Promise<number> {
+  // Auto-close meetings that are active but created more than 2 hours ago
+  await pool.query(
+    `UPDATE meetings 
+     SET ended_at = created_at + INTERVAL '30 minutes',
+         duration_sec = 1800
+     WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
+  )
+
   const result = await pool.query(
     "SELECT COUNT(*) FROM meetings WHERE ended_at IS NULL",
   )

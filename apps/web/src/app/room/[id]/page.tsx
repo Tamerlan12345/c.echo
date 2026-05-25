@@ -1390,7 +1390,14 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
       // Function to safely connect a track stream to the destination mixer
       const connectStream = (stream: MediaStream, id: string) => {
-        if (activeSourcesRef.current.has(id)) return
+        const existing = activeSourcesRef.current.get(id)
+        if (existing) {
+          if (existing.mediaStream === stream) return
+          try {
+            existing.disconnect()
+          } catch (e) {}
+          activeSourcesRef.current.delete(id)
+        }
         try {
           if (stream.getAudioTracks().length === 0) return
           const source = audioCtx.createMediaStreamSource(stream)
@@ -1422,8 +1429,22 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
         }
       }
 
+      const onTrackUnsubscribed = (track: any, publication: any, participant: any) => {
+        if (track.kind === 'audio') {
+          const existing = activeSourcesRef.current.get(participant.identity)
+          if (existing) {
+            try {
+              existing.disconnect()
+            } catch (e) {}
+            activeSourcesRef.current.delete(participant.identity)
+          }
+        }
+      }
+
       room.on(RoomEvent.TrackSubscribed, onTrackSubscribed)
+      room.on(RoomEvent.TrackUnsubscribed, onTrackUnsubscribed)
       ;(window as any)._onTrackSubscribed = onTrackSubscribed
+      ;(window as any)._onTrackUnsubscribed = onTrackUnsubscribed
 
       // 2. Initialize MediaRecorder
       const options = { mimeType: 'audio/webm;codecs=opus' }
@@ -1441,6 +1462,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
       recorder.onstop = async () => {
         room.off(RoomEvent.TrackSubscribed, (window as any)._onTrackSubscribed)
+        room.off(RoomEvent.TrackUnsubscribed, (window as any)._onTrackUnsubscribed)
         if (audioContextRef.current) {
           await audioContextRef.current.close()
         }

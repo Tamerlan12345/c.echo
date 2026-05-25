@@ -102,8 +102,23 @@ export const googleAuthRoutes: FastifyPluginAsync = async (app) => {
         )
         user = insertRes.rows[0]
       } else {
-        // User not found — they must be invited by admin first
-        return reply.redirect(`${process.env.FRONTEND_URL}/login?error=not_invited`)
+        const allowedDomainsStr = process.env.ALLOWED_DOMAINS ?? ''
+        const allowedDomains = allowedDomainsStr.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean)
+        const emailDomain = googleUser.email.split('@')[1]?.toLowerCase()
+        const isAllowedDomain = emailDomain ? allowedDomains.includes(emailDomain) : false
+
+        if (isAllowedDomain) {
+          const insertRes = await pool.query(
+            `INSERT INTO users (email, name, role, google_id, avatar_url)
+             VALUES ($1, $2, 'employee', $3, $4)
+             RETURNING id, email, name, role, avatar_url, google_id`,
+            [googleUser.email.toLowerCase(), googleUser.name, googleUser.sub, googleUser.picture ?? null]
+          )
+          user = insertRes.rows[0]
+        } else {
+          // User not found — they must be invited by admin first
+          return reply.redirect(`${process.env.FRONTEND_URL}/login?error=not_invited`)
+        }
       }
     }
 

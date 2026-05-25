@@ -220,10 +220,10 @@ export const livekitApi = {
 // ─── Senti ────────────────────────────────────────────────────────────────────
 
 export const sentiApi = {
-  chat: (meetingId: string, question: string) =>
+  chat: (meetingId: string, question: string, history?: Array<{ role: string; text: string }>) =>
     apiFetch<SentiChatResponse>('/api/senti/chat', {
       method: 'POST',
-      body: JSON.stringify({ meetingId, question }),
+      body: JSON.stringify({ meetingId, question, history }),
     }),
 }
 

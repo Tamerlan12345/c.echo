@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import '@fastify/multipart'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
-import { pool } from '../db/pool.js'
+import { pool, runWithUser } from '../db/pool.js'
 
 const CreateMeetingSchema = z.object({
   title: z.string().min(1).max(200),
@@ -68,33 +68,35 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
          WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
       )
 
-      const result = await pool.query(
-        `SELECT
-           m.id, m.title, m.creator_id AS "creatorId",
-           COALESCE(m.host_id, m.creator_id) AS "hostId",
-           m.livekit_room AS "livekitRoom",
-           m.created_at AS "createdAt", m.ended_at AS "endedAt",
-           m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
-           m.senti_status AS "sentiStatus", m.summary,
-           m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
-           m.waiting_room_enabled AS "waitingRoomEnabled",
-           m.mute_on_entry AS "muteOnEntry",
-           json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
-           (
-             SELECT json_agg(json_build_object(
-               'userId', p.id, 'name', p.name, 'avatarUrl', p.avatar_url, 'joinedAt', mp2.joined_at
-             ))
-             FROM meeting_participants mp2
-             JOIN users p ON p.id = mp2.user_id
-             WHERE mp2.meeting_id = m.id
-           ) AS participants
-         FROM meetings m
-         JOIN users u ON u.id = m.creator_id
-         WHERE m.creator_id = $1
-            OR m.id IN (SELECT meeting_id FROM meeting_participants WHERE user_id = $1)
-         ORDER BY m.created_at DESC
-         LIMIT 50`,
-        [user.sub],
+      const result = await runWithUser(user.sub, (client) =>
+        client.query(
+          `SELECT
+             m.id, m.title, m.creator_id AS "creatorId",
+             COALESCE(m.host_id, m.creator_id) AS "hostId",
+             m.livekit_room AS "livekitRoom",
+             m.created_at AS "createdAt", m.ended_at AS "endedAt",
+             m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
+             m.senti_status AS "sentiStatus", m.summary,
+             m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
+             m.waiting_room_enabled AS "waitingRoomEnabled",
+             m.mute_on_entry AS "muteOnEntry",
+             json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
+             (
+               SELECT json_agg(json_build_object(
+                 'userId', p.id, 'name', p.name, 'avatarUrl', p.avatar_url, 'joinedAt', mp2.joined_at
+               ))
+               FROM meeting_participants mp2
+               JOIN users p ON p.id = mp2.user_id
+               WHERE mp2.meeting_id = m.id
+             ) AS participants
+           FROM meetings m
+           JOIN users u ON u.id = m.creator_id
+           WHERE m.creator_id = $1
+              OR m.id IN (SELECT meeting_id FROM meeting_participants WHERE user_id = $1)
+           ORDER BY m.created_at DESC
+           LIMIT 50`,
+          [user.sub],
+        )
       )
 
       return reply.send({ data: result.rows })
@@ -107,6 +109,14 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       if (!body.success) {
         return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: body.error.message } })
       }
+
+      // Auto-close meetings that are active but created more than 2 hours ago
+      await pool.query(
+        `UPDATE meetings 
+         SET ended_at = created_at + INTERVAL '30 minutes',
+             duration_sec = 1800
+         WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
+      )
 
       const { title, scheduledStart, isPublic, waitingRoomEnabled } = body.data
       const roomName = `centras-${randomUUID()}`
@@ -147,30 +157,32 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         [id]
       )
 
-      const result = await pool.query(
-        `SELECT
-           m.id, m.title, m.creator_id AS "creatorId",
-           COALESCE(m.host_id, m.creator_id) AS "hostId",
-           m.livekit_room AS "livekitRoom",
-           m.created_at AS "createdAt", m.ended_at AS "endedAt",
-           m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
-           m.senti_status AS "sentiStatus", m.summary,
-           m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
-           m.waiting_room_enabled AS "waitingRoomEnabled",
-           m.mute_on_entry AS "muteOnEntry",
-           json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
-           (
-             SELECT json_agg(json_build_object(
-               'userId', p.id, 'name', p.name, 'avatarUrl', p.avatar_url, 'joinedAt', mp.joined_at
-             ))
-             FROM meeting_participants mp
-             JOIN users p ON p.id = mp.user_id
-             WHERE mp.meeting_id = m.id
-           ) AS participants
-         FROM meetings m
-         JOIN users u ON u.id = m.creator_id
-         WHERE m.id = $1`,
-        [id],
+      const result = await runWithUser(user.sub, (client) =>
+        client.query(
+          `SELECT
+             m.id, m.title, m.creator_id AS "creatorId",
+             COALESCE(m.host_id, m.creator_id) AS "hostId",
+             m.livekit_room AS "livekitRoom",
+             m.created_at AS "createdAt", m.ended_at AS "endedAt",
+             m.duration_sec AS "durationSec", m.is_recorded AS "isRecorded",
+             m.senti_status AS "sentiStatus", m.summary,
+             m.scheduled_start AS "scheduledStart", m.is_public AS "isPublic",
+             m.waiting_room_enabled AS "waitingRoomEnabled",
+             m.mute_on_entry AS "muteOnEntry",
+             json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url) AS creator,
+             (
+               SELECT json_agg(json_build_object(
+                 'userId', p.id, 'name', p.name, 'avatarUrl', p.avatar_url, 'joinedAt', mp.joined_at
+               ))
+               FROM meeting_participants mp
+               JOIN users p ON p.id = mp.user_id
+               WHERE mp.meeting_id = m.id
+             ) AS participants
+           FROM meetings m
+           JOIN users u ON u.id = m.creator_id
+           WHERE m.id = $1`,
+          [id],
+        )
       )
 
       if (!result.rows[0]) {
@@ -182,12 +194,33 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
 
     // POST /api/meetings/:id/join — record participant join
     app.post('/:id/join', async (request, reply) => {
-      const user = request.user as { sub: string }
+      const user = request.user as { sub: string; email?: string }
       const { id } = request.params as { id: string }
 
-      const meeting = await pool.query('SELECT id FROM meetings WHERE id = $1', [id])
-      if (!meeting.rows[0]) {
+      const meetingResult = await pool.query(
+        'SELECT id, creator_id, COALESCE(host_id, creator_id) AS host_id, is_public AS "isPublic", waiting_room_enabled AS "waitingRoomEnabled" FROM meetings WHERE id = $1',
+        [id]
+      )
+      const meeting = meetingResult.rows[0]
+      if (!meeting) {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+
+      const isGuest = user.email?.endsWith('@guest.centras-echo.local') ?? false
+      if (!meeting.isPublic && isGuest) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Гостям запрещен доступ к приватным встречам' } })
+      }
+
+      const isHost = meeting.host_id === user.sub
+      if (meeting.waitingRoomEnabled && !isHost) {
+        const waitResult = await pool.query(
+          'SELECT status FROM meeting_waiting_room WHERE meeting_id = $1 AND user_id = $2',
+          [id, user.sub]
+        )
+        const status = waitResult.rows[0]?.status
+        if (status !== 'admitted') {
+          return reply.status(403).send({ error: { code: 'WAITING_ROOM', message: 'Вы должны быть одобрены организатором для входа' } })
+        }
       }
 
       await pool.query(
