@@ -19,7 +19,7 @@ import {
   PhoneOff, Bot, Shield, CheckCircle2, XCircle,
   Circle, StopCircle, X, LogOut, MessageSquare, Send,
   Globe, Copy, Check, Calendar, Lock, Hand, Smile, VolumeX,
-  LayoutGrid, User as UserIcon
+  LayoutGrid, User as UserIcon, MoreHorizontal
 } from 'lucide-react'
 import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
@@ -1017,6 +1017,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
   // UI state
   const [showSenti, setShowSenti] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [roomCopied, setRoomCopied] = useState(false)
 
   const handleCopyRoomInvite = () => {
@@ -1888,7 +1889,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
         {/* Controls */}
         <div className={styles.controlsBar}>
           {/* Left: participants + layout + host moderation */}
-          <div className={styles.controlsLeft}>
+          <div className={`${styles.controlsLeft} ${styles.desktopOnly}`}>
             <Tooltip label={showParticipants ? 'Скрыть участников' : 'Показать участников'}>
               <button
                 id="toggle-participants-btn"
@@ -1900,7 +1901,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
               </button>
             </Tooltip>
 
-            <Tooltip label={viewMode === 'gallery' ? 'Вид: активный докладчик' : 'Вид: сетка'}>
+            <Tooltip label={viewMode === 'gallery' ? 'Вид: active speaker' : 'Вид: grid'}>
               <button
                 id="toggle-view-mode-btn"
                 className={`${styles.controlBtn} ${viewMode === 'speaker' ? styles.active : ''}`}
@@ -1968,7 +1969,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
               <span className={styles.controlLabel}>{camEnabled ? 'Камера' : 'Камера откл.'}</span>
             </div>
 
-            <div className={styles.controlGroup}>
+            <div className={`${styles.controlGroup} ${styles.desktopOnly}`}>
               <Tooltip label={screenSharing ? 'Остановить трансляцию' : 'Показать экран'}>
                 <button
                   id="toggle-screen-btn"
@@ -1983,7 +1984,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
             </div>
 
             {/* Raise Hand */}
-            <div className={styles.controlGroup}>
+            <div className={`${styles.controlGroup} ${styles.desktopOnly}`}>
               <Tooltip label={raisedHands[localParticipant?.identity || ''] ? 'Опустить руку' : 'Поднять руку'}>
                 <button
                   id="toggle-raise-hand-btn"
@@ -2000,7 +2001,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
             </div>
 
             {/* Reactions (Smile menu) */}
-            <div className={styles.controlGroup} style={{ position: 'relative' }}>
+            <div className={`${styles.controlGroup} ${styles.desktopOnly}`} style={{ position: 'relative' }}>
               <Tooltip label="Реакции">
                 <button
                   id="toggle-reactions-btn"
@@ -2029,7 +2030,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
             </div>
 
             {/* Noise Suppression */}
-            <div className={styles.controlGroup}>
+            <div className={`${styles.controlGroup} ${styles.desktopOnly}`}>
               <Tooltip label={noiseSuppression ? 'Отключить шумоподавление' : 'Включить шумоподавление'}>
                 <button
                   id="toggle-noise-suppression-btn"
@@ -2043,6 +2044,24 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
               <span className={styles.controlLabel}>
                 {noiseSuppression ? 'Шум откл.' : 'Шумопод.'}
               </span>
+            </div>
+
+            {/* Mobile More button */}
+            <div className={`${styles.controlGroup} ${styles.mobileOnly}`}>
+              <button
+                id="mobile-more-btn"
+                className={`${styles.controlBtn} ${showMoreMenu ? styles.active : ''}`}
+                onClick={() => {
+                  setShowMoreMenu((v) => !v)
+                  setShowChat(false)
+                  setShowSenti(false)
+                  setShowParticipants(false)
+                }}
+                aria-label="Ещё"
+              >
+                <MoreHorizontal size={20} />
+              </button>
+              <span className={styles.controlLabel}>Ещё</span>
             </div>
 
             <button
@@ -2072,6 +2091,8 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
                   onClick={() => {
                     setShowChat((v) => !v)
                     if (showSenti) setShowSenti(false)
+                    setShowMoreMenu(false)
+                    setShowParticipants(false)
                   }}
                   aria-label="Чат встречи"
                 >
@@ -2083,16 +2104,18 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
               </div>
             </Tooltip>
             {isHost && (
-              <Tooltip label={showSenti ? 'Закрыть Senti' : 'Открыть Senti-протокол'}>
-                <button
-                  id="toggle-senti-btn"
-                  className={`${styles.controlBtn} ${showSenti ? styles.sentiActive : ''}`}
-                  onClick={() => setShowSenti((v) => !v)}
-                  aria-label="Senti протокол"
-                >
-                  <Bot size={20} />
-                </button>
-              </Tooltip>
+              <div className={styles.desktopOnly}>
+                <Tooltip label={showSenti ? 'Закрыть Senti' : 'Открыть Senti-протокол'}>
+                  <button
+                    id="toggle-senti-btn"
+                    className={`${styles.controlBtn} ${showSenti ? styles.sentiActive : ''}`}
+                    onClick={() => setShowSenti((v) => !v)}
+                    aria-label="Senti протокол"
+                  >
+                    <Bot size={20} />
+                  </button>
+                </Tooltip>
+              </div>
             )}
           </div>
         </div>
@@ -2442,6 +2465,130 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Mobile Backdrop ── */}
+      {(showChat || showSenti || showParticipants || showMoreMenu) && (
+        <div
+          className={styles.mobileBackdrop}
+          onClick={() => {
+            setShowChat(false)
+            setShowSenti(false)
+            setShowParticipants(false)
+            setShowMoreMenu(false)
+          }}
+        />
+      )}
+
+      {/* ── Mobile More Menu Drawer ── */}
+      {showMoreMenu && (
+        <aside className={styles.moreMenuDrawer}>
+          <div className={styles.moreMenuHeader}>
+            <span className={styles.moreMenuTitle}>Ещё</span>
+            <button
+              className={styles.controlBtn}
+              style={{ width: 32, height: 32 }}
+              onClick={() => setShowMoreMenu(false)}
+              aria-label="Закрыть меню"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Quick Reactions Grid directly in drawer */}
+          <div style={{ display: 'flex', justifyContent: 'space-around', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-border)', marginBottom: 'var(--space-3)' }}>
+            {['👍', '👏', '❤️', '😂', '🎉', '😮'].map((emoji) => (
+              <button
+                key={emoji}
+                style={{ fontSize: '1.6rem', background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={() => {
+                  sendReaction(emoji)
+                  setShowMoreMenu(false)
+                }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          <div className={styles.moreMenuGrid}>
+            {/* Raise Hand */}
+            <button
+              className={`${styles.moreMenuBtn} ${raisedHands[localParticipant?.identity || ''] ? styles.moreMenuBtnActive : ''}`}
+              onClick={() => {
+                toggleRaiseHand()
+                setShowMoreMenu(false)
+              }}
+            >
+              <div className={styles.moreMenuIconWrapper}>
+                <Hand size={20} />
+              </div>
+              <span className={styles.moreMenuBtnLabel}>
+                {raisedHands[localParticipant?.identity || ''] ? 'Опустить руку' : 'Поднять руку'}
+              </span>
+            </button>
+
+            {/* Noise Suppression */}
+            <button
+              className={`${styles.moreMenuBtn} ${noiseSuppression ? styles.moreMenuBtnActive : ''}`}
+              onClick={() => {
+                toggleNoiseSuppression()
+                setShowMoreMenu(false)
+              }}
+            >
+              <div className={styles.moreMenuIconWrapper}>
+                <VolumeX size={20} />
+              </div>
+              <span className={styles.moreMenuBtnLabel}>Шумоподавление</span>
+            </button>
+
+            {/* Participants list toggle */}
+            <button
+              className={`${styles.moreMenuBtn} ${showParticipants ? styles.moreMenuBtnActive : ''}`}
+              onClick={() => {
+                setShowParticipants((v) => !v)
+                setShowMoreMenu(false)
+              }}
+            >
+              <div className={styles.moreMenuIconWrapper}>
+                <Users size={20} />
+              </div>
+              <span className={styles.moreMenuBtnLabel}>Участники ({allParticipants.length})</span>
+            </button>
+
+            {/* Senti AI toggle (Host only) */}
+            {isHost && (
+              <button
+                className={`${styles.moreMenuBtn} ${showSenti ? styles.moreMenuBtnActive : ''}`}
+                onClick={() => {
+                  setShowSenti((v) => !v)
+                  setShowMoreMenu(false)
+                }}
+              >
+                <div className={styles.moreMenuIconWrapper}>
+                  <Bot size={20} color="var(--color-accent-amber)" />
+                </div>
+                <span className={styles.moreMenuBtnLabel}>Senti AI</span>
+              </button>
+            )}
+
+            {/* Toggle View mode */}
+            <button
+              className={styles.moreMenuBtn}
+              onClick={() => {
+                setViewMode((v) => (v === 'gallery' ? 'speaker' : 'gallery'))
+                setShowMoreMenu(false)
+              }}
+            >
+              <div className={styles.moreMenuIconWrapper}>
+                {viewMode === 'gallery' ? <UserIcon size={20} /> : <LayoutGrid size={20} />}
+              </div>
+              <span className={styles.moreMenuBtnLabel}>
+                {viewMode === 'gallery' ? 'Докладчик' : 'Сетка'}
+              </span>
+            </button>
+          </div>
+        </aside>
       )}
     </div>
   )

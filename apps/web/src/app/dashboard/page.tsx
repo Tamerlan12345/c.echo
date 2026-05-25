@@ -137,6 +137,25 @@ export default function DashboardPage() {
 
   return (
     <div className={`${styles.layout} fade-up`}>
+      {/* Mobile Header */}
+      <header className={styles.mobileHeader}>
+        <Logo size={28} />
+        <div className={styles.mobileUser}>
+          <div className="avatar avatar-sm" title={user?.name}>
+            {initials(user?.name ?? 'U')}
+          </div>
+          <button
+            className={styles.logoutBtn}
+            onClick={authApi.logout}
+            title="Выйти"
+            aria-label="Выйти из системы"
+            style={{ display: 'flex', padding: '6px' }}
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      </header>
+
       {/* Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
