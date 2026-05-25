@@ -100,8 +100,8 @@ export default function RoomPage() {
   const [initialMicEnabled, setInitialMicEnabled] = useState(true)
 
   // Hardware status
-  const [hasCamera, setHasCamera] = useState(true)
-  const [hasMicrophone, setHasMicrophone] = useState(true)
+  const [hasCamera, setHasCamera] = useState(false)
+  const [hasMicrophone, setHasMicrophone] = useState(false)
 
   // Involuntary disconnect & recovery
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -120,6 +120,11 @@ export default function RoomPage() {
       }).catch((err) => {
         console.warn('Enumerate devices on page mount failed, assuming hardware exists:', err)
       })
+    } else {
+      setHasCamera(false)
+      setHasMicrophone(false)
+      setInitialCamEnabled(false)
+      setInitialMicEnabled(false)
     }
   }, [])
 
@@ -578,6 +583,18 @@ export default function RoomPage() {
       connect={true}
       video={hasCamera && initialCamEnabled ? (selectedCamId ? { deviceId: selectedCamId } : true) : false}
       audio={hasMicrophone && initialMicEnabled ? (selectedMicId ? { deviceId: selectedMicId } : true) : false}
+      connectOptions={{
+        autoSubscribe: true,
+        peerConnectionTimeout: 15000,
+        rtcConfig: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun.livekit.host:19302' }
+          ]
+        }
+      }}
       onDisconnected={() => {
         if (isLeavingRef.current) {
           const isGuest = user?.email.endsWith('@guest.centras-echo.local')
@@ -701,6 +718,11 @@ function PreJoinScreen({
   // Load initially available hardware devices and match enabled flags to physical hardware
   useEffect(() => {
     const checkDevices = async () => {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+        setCams([])
+        setMics([])
+        return
+      }
       try {
         const devices = await navigator.mediaDevices.enumerateDevices()
         const hasCam = devices.some((d) => d.kind === 'videoinput')
@@ -731,6 +753,10 @@ function PreJoinScreen({
       stopStream()
       if (!camEnabled && !micEnabled) {
         setAudioLevel(0)
+        return
+      }
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+        setPermissionError('Медиа-устройства не поддерживаются в данном браузере (требуется HTTPS).')
         return
       }
       try {
@@ -1348,6 +1374,11 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
         await localParticipant.setMicrophoneEnabled(true)
         setMicEnabled(true)
       } else {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+          alert('Доступ к микрофону недоступен в этом браузере (требуется HTTPS).')
+          setNoiseSuppression(false)
+          return
+        }
         setNoiseSuppression(true)
         
         // 1. Get raw media stream from microphone
