@@ -43,7 +43,7 @@ export async function runWithUser<T>(
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    await client.query("SET LOCAL app.current_user_id = $1", [userId])
+    await client.query("SELECT set_config('app.current_user_id', $1, true)", [userId])
     const res = await fn(client)
     await client.query('COMMIT')
     return res
