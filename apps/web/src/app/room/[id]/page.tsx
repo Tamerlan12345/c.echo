@@ -99,6 +99,30 @@ export default function RoomPage() {
   const [initialCamEnabled, setInitialCamEnabled] = useState(true)
   const [initialMicEnabled, setInitialMicEnabled] = useState(true)
 
+  // Hardware status
+  const [hasCamera, setHasCamera] = useState(true)
+  const [hasMicrophone, setHasMicrophone] = useState(true)
+
+  // Involuntary disconnect & recovery
+  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const isLeavingRef = useRef(false)
+
+  // System-level check of camera/mic presence on mount
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+      navigator.mediaDevices.enumerateDevices().then((devices) => {
+        const hasCam = devices.some((d) => d.kind === 'videoinput')
+        const hasMic = devices.some((d) => d.kind === 'audioinput')
+        setHasCamera(hasCam)
+        setHasMicrophone(hasMic)
+        if (!hasCam) setInitialCamEnabled(false)
+        if (!hasMic) setInitialMicEnabled(false)
+      }).catch((err) => {
+        console.warn('Enumerate devices on page mount failed, assuming hardware exists:', err)
+      })
+    }
+  }, [])
+
   const init = useCallback(async () => {
     // 1. Try to load authenticated user profile
     const meRes = await authApi.me({ skipRedirect: true })
@@ -276,6 +300,33 @@ export default function RoomPage() {
         <button className="btn btn-ghost" style={{ marginTop: 16 }} onClick={() => router.push('/dashboard')}>
           На главную
         </button>
+      </div>
+    )
+  }
+
+  if (connectionError) {
+    return (
+      <div className={styles.loadingRoom}>
+        <XCircle size={48} color="var(--color-danger)" />
+        <h2 style={{ color: 'var(--color-text-primary)', marginTop: 16, fontSize: '1.25rem', fontWeight: 600 }}>
+          Соединение прервано
+        </h2>
+        <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 8, maxWidth: 420, fontSize: '0.875rem', lineHeight: 1.5 }}>
+          {connectionError}
+        </p>
+        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+          <button className="btn btn-primary" onClick={() => {
+            setConnectionError(null)
+            setToken(null)
+            isLeavingRef.current = false
+            init()
+          }}>
+            Подключиться повторно
+          </button>
+          <button className="btn btn-ghost" onClick={() => router.push('/dashboard')}>
+            На главную
+          </button>
+        </div>
       </div>
     )
   }
@@ -525,23 +576,37 @@ export default function RoomPage() {
       token={token}
       serverUrl={serverUrl}
       connect={true}
-      video={initialCamEnabled ? (selectedCamId ? { deviceId: selectedCamId } : true) : false}
-      audio={initialMicEnabled ? (selectedMicId ? { deviceId: selectedMicId } : true) : false}
+      video={hasCamera && initialCamEnabled ? (selectedCamId ? { deviceId: selectedCamId } : true) : false}
+      audio={hasMicrophone && initialMicEnabled ? (selectedMicId ? { deviceId: selectedMicId } : true) : false}
       onDisconnected={() => {
-        const isGuest = user?.email.endsWith('@guest.centras-echo.local')
-        if (isGuest) {
-          setIsEnded(true)
-          sessionStorage.removeItem('centras_access')
-          localStorage.removeItem('centras_refresh')
-          document.cookie = 'centras_access=; path=/; max-age=0; SameSite=Lax; Secure'
-        } else {
-          router.push('/dashboard')
+        if (isLeavingRef.current) {
+          const isGuest = user?.email.endsWith('@guest.centras-echo.local')
+          if (isGuest) {
+            setIsEnded(true)
+            sessionStorage.removeItem('centras_access')
+            localStorage.removeItem('centras_refresh')
+            document.cookie = 'centras_access=; path=/; max-age=0; SameSite=Lax; Secure'
+          } else {
+            router.push('/dashboard')
+          }
+          return
         }
+
+        // Involuntary disconnect — show the premium recovery screen
+        setConnectionError('Соединение с сервером видеоконференций Centras Echo потеряно. Проверьте стабильность интернет-соединения и настройки корпоративного брандмауэра.')
       }}
       style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}
     >
       <RoomAudioRenderer />
-      <RoomInner meeting={meeting} user={user} meetingId={id} router={router} />
+      <RoomInner
+        meeting={meeting}
+        user={user}
+        meetingId={id}
+        router={router}
+        onLeave={() => {
+          isLeavingRef.current = true
+        }}
+      />
     </LiveKitRoom>
   )
 }
@@ -633,6 +698,31 @@ function PreJoinScreen({
     }
   }, [])
 
+  // Load initially available hardware devices and match enabled flags to physical hardware
+  useEffect(() => {
+    const checkDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const hasCam = devices.some((d) => d.kind === 'videoinput')
+        const hasMic = devices.some((d) => d.kind === 'audioinput')
+        
+        setCams(devices.filter((d) => d.kind === 'videoinput'))
+        setMics(devices.filter((d) => d.kind === 'audioinput'))
+        
+        // If device is physically absent but enabled, toggle it off to prevent initial fail
+        if (!hasCam && camEnabled) {
+          onToggleCam()
+        }
+        if (!hasMic && micEnabled) {
+          onToggleMic()
+        }
+      } catch (e) {
+        console.warn('Failed to enumerate devices initially:', e)
+      }
+    }
+    checkDevices()
+  }, [])
+
   // Acquire / re-acquire preview stream when device choices or enable flags change
   useEffect(() => {
     let cancelled = false
@@ -652,13 +742,33 @@ function PreJoinScreen({
             ? (selectedMicId ? { deviceId: { exact: selectedMicId } } : true)
             : false,
         }
-        const stream = await navigator.mediaDevices.getUserMedia(constraints)
+        
+        let stream: MediaStream
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+        } catch (err: any) {
+          // Fallback: if both were requested, try to acquire only audio
+          if (constraints.video && constraints.audio) {
+            console.warn('Dual getUserMedia failed, retrying audio-only constraints')
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: constraints.audio,
+              video: false,
+            })
+            // Gracefully toggle off camera state to match reality
+            if (camEnabled) {
+              onToggleCam()
+            }
+          } else {
+            throw err
+          }
+        }
+        
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop())
           return
         }
         streamRef.current = stream
-        if (videoRef.current && camEnabled) {
+        if (videoRef.current && camEnabled && stream.getVideoTracks().length > 0) {
           videoRef.current.srcObject = stream
         }
 
@@ -704,7 +814,7 @@ function PreJoinScreen({
       cancelled = true
       stopStream()
     }
-  }, [selectedCamId, selectedMicId, camEnabled, micEnabled, stopStream])
+  }, [selectedCamId, selectedMicId, camEnabled, micEnabled, stopStream, onToggleCam, onToggleMic])
 
   const handleJoin = () => {
     stopStream()
@@ -845,6 +955,7 @@ interface RoomInnerProps {
   user: User
   meetingId: string
   router: ReturnType<typeof useRouter>
+  onLeave: () => void
 }
 
 interface ChatMessage {
@@ -855,7 +966,7 @@ interface ChatMessage {
   timestamp: number
 }
 
-function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
+function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps) {
   const room = useRoomContext()
   const remoteParticipants = useParticipants().filter((p) => !p.isLocal)
   const { localParticipant } = useLocalParticipant()
@@ -1537,6 +1648,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
   // Leave call (just exit, don't end)
   const handleLeaveCall = async () => {
+    onLeave()
     if (isHost && isRecording) {
       await livekitApi.stopRecording(meetingId)
       await stopAndUploadRecording()
@@ -1547,6 +1659,7 @@ function RoomInner({ meeting, user, meetingId, router }: RoomInnerProps) {
 
   // End call
   const handleEndCall = async () => {
+    onLeave()
     if (isRecording) {
       await livekitApi.stopRecording(meetingId)
       await stopAndUploadRecording()
