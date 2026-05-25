@@ -126,12 +126,7 @@ CREATE POLICY meetings_access ON meetings
 CREATE POLICY participants_access ON meeting_participants
     FOR ALL
     USING (
-        user_id = NULLIF(current_setting('app.current_user_id', true), '')::UUID
-        OR EXISTS (
-            SELECT 1 FROM meetings m
-            WHERE m.id = meeting_participants.meeting_id
-              AND m.creator_id = NULLIF(current_setting('app.current_user_id', true), '')::UUID
-        )
+        true
     );
 
 CREATE POLICY transcripts_access ON meeting_transcripts

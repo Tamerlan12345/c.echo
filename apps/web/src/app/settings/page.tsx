@@ -67,10 +67,10 @@ export default function SettingsPage() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
           <div className={styles.fullLogo}>
-            <Logo size={26} />
+            <Logo size={38} />
           </div>
           <div className={styles.iconLogo}>
-            <LogoIcon />
+            <LogoIcon width={40} height={40} />
           </div>
         </div>
         <nav className={styles.sidebarNav}>

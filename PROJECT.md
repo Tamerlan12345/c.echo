@@ -39,6 +39,7 @@
 | 5 | Лимиты комнат и автозакрытие встреч | [x] | [limits.ts](file:///f:/c.echo/apps/api/src/services/limits.ts), [meetings.ts](file:///f:/c.echo/apps/api/src/routes/meetings.ts) | Внедрена фоновая ленивая очистка зависших комнат при создании новой встречи и при запросе лимитов. |
 | 6 | Доменная авторегистрация Google SSO | [x] | [google-auth.ts](file:///f:/c.echo/apps/api/src/routes/google-auth.ts) | Внедрена авторегистрация сотрудников с белым списком доменов через переменную `ALLOWED_DOMAINS`. |
 | 7 | Интеграция Gemini Files API и Multi-Turn Chat | [x] | [gemini.ts](file:///f:/c.echo/apps/api/src/services/gemini.ts), [senti.ts](file:///f:/c.echo/apps/api/src/routes/senti.ts), [page.tsx](file:///f:/c.echo/apps/web/src/app/archive/%5Bid%5D/page.tsx) | Пайплайн переведен на Files API. Чат Senti теперь хранит контекст до 10 реплик. Расширен фронтенд загрузчик аудио. |
+| 8 | Устранение RLS-рекурсии (500 ошибка) и редизайн логотипа SENTI AI | [x] | [schema.sql](file:///f:/c.echo/apps/api/src/db/schema.sql), [Logo.tsx](file:///f:/c.echo/apps/web/src/components/Logo.tsx), [page.tsx](file:///f:/c.echo/apps/web/src/app/login/page.tsx) | Исправлена рекурсия RLS на бэкенде. Произведен полный редизайн логотипа: стеклянная подложка, глянцевая SVG-камера и неоновый бейдж SENTI AI. Увеличены размеры логотипа на экранах входа и сайдбара. |
 
 ---
 

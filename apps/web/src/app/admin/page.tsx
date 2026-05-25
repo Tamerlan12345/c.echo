@@ -290,7 +290,7 @@ function Sidebar({ user }: { user: User | null }) {
   return (
     <aside className="sidebar">
       <div style={{ marginBottom: 'var(--space-6)', display: 'flex', justifyContent: 'center' }}>
-        <LogoIcon />
+        <LogoIcon width={40} height={40} />
       </div>
       <a href="/dashboard" aria-label="Встречи" title="Встречи">
         <Video size={22} color="var(--color-text-muted)" />

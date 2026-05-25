@@ -141,10 +141,10 @@ export default function DashboardPage() {
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
           <div className={styles.fullLogo}>
-            <Logo size={32} />
+            <Logo size={38} />
           </div>
           <div className={styles.iconLogo}>
-            <LogoIcon width={36} height={36} />
+            <LogoIcon width={40} height={40} />
           </div>
         </div>
 
