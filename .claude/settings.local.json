@@ -26,7 +26,8 @@
       "Bash(awk 'NR>=73 && NR<=260' apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
       "Bash(grep -nE \"^\\\\s{4,}.*use\\(State|Effect|Ref|Callback|Memo\\)\\\\b\" apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
       "Bash(grep -nE \"^\\\\s{4,}.*use[A-Z]\" apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
-      "Bash(awk -F: '{print $1}')"
+      "Bash(awk -F: '{print $1}')",
+      "Bash(nslookup nozomi.proxy.rlwy.net 8.8.8.8)"
     ]
   }
 }

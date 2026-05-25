@@ -1,12 +1,33 @@
 # LiveKit Self-Hosted configuration for Railway
-# Mount this file at /etc/livekit.yaml in the container
+# Mount this file at /etc/livekit.yaml in the container.
+#
+# Railway specifics:
+# - No UDP ingress. ICE-TCP fallback is mandatory.
+# - TCP Proxy gives a random external port. LiveKit must listen on the SAME port
+#   that Railway exposes publicly, because LiveKit advertises its listen port in
+#   ICE candidates. Set LIVEKIT_TCP_PORT and Railway TCP Proxy target port to the
+#   same value (the port Railway shows you in dashboard).
+# - node_ip must be the public IP of Railway's TCP Proxy edge (not the container
+#   egress IP), otherwise advertised ICE candidates point nowhere.
 
 port: 7880
+
 rtc:
-  tcp_port: 7881
+  # Must equal the public TCP port Railway assigned for this service.
+  tcp_port: ${LIVEKIT_TCP_PORT}
+
+  # Public IP that Railway TCP Proxy resolves to. Look up via:
+  #   nslookup <your-proxy-host>.proxy.rlwy.net
+  node_ip: ${LIVEKIT_NODE_IP}
+
+  # UDP is unreachable from outside on Railway — keep range minimal.
+  # Range still required by LiveKit, but it's effectively unused.
   port_range_start: 50000
-  port_range_end: 60000
-  use_external_ip: true
+  port_range_end: 50010
+
+  # Disabled: we provide node_ip explicitly. Auto-detect resolves the container
+  # egress IP, which is different from the proxy edge IP clients connect to.
+  use_external_ip: false
 
 # CORS — allow frontend origin to validate tokens via HTTP before WebSocket upgrade
 allowed_origins:
@@ -31,6 +52,6 @@ room:
   max_participants: 7
   empty_timeout: 300  # 5 minutes
 
-# Turn server (optional — Railway can expose TCP/UDP)
+# TURN is added in Phase B (TURN/TLS with custom domain).
 turn:
   enabled: false
