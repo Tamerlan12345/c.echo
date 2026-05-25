@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify'
+import { RoomServiceClient } from 'livekit-server-sdk'
 import { pool } from '../db/pool.js'
 import type { User } from '@centras/shared'
 
@@ -6,16 +7,42 @@ import type { User } from '@centras/shared'
 export const MAX_PARTICIPANTS_PER_MEETING = 7
 export const MAX_ACTIVE_MEETINGS = 5
 
+const getLiveKitUrl = (): string => {
+  const url = process.env.LIVEKIT_URL || ''
+  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
+    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
+  }
+  return url
+}
+
+export async function cleanupGuests(): Promise<void> {
+  await pool.query(`
+    DELETE FROM users
+    WHERE email LIKE '%@guest.centras-echo.local'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM meeting_participants mp
+        JOIN meetings m ON m.id = mp.meeting_id
+        WHERE mp.user_id = users.id
+          AND m.ended_at IS NULL
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM meeting_waiting_room wr
+        JOIN meetings m ON m.id = wr.meeting_id
+        WHERE wr.user_id = users.id
+          AND m.ended_at IS NULL
+      )
+  `)
+}
+
 export const limitsRoutes: FastifyPluginAsync = async (app) => {
 
   // Checks used by meetings routes
   app.decorate('checkMeetingLimits', async (meetingId: string, userId: string) => {
     // 1. Check participant count for this meeting
-    const participantCount = await pool.query(
-      'SELECT COUNT(*) FROM meeting_participants WHERE meeting_id = $1',
-      [meetingId],
-    )
-    if (Number(participantCount.rows[0].count) >= MAX_PARTICIPANTS_PER_MEETING) {
+    const participantCount = await getParticipantCount(meetingId)
+    if (participantCount >= MAX_PARTICIPANTS_PER_MEETING) {
       return { allowed: false, reason: `Максимум ${MAX_PARTICIPANTS_PER_MEETING} участников на встречу` }
     }
 
@@ -25,7 +52,7 @@ export const limitsRoutes: FastifyPluginAsync = async (app) => {
       [userId],
     )
     if (Number(activeCount.rows[0].count) >= MAX_ACTIVE_MEETINGS) {
-      return { allowed: false, reason: `Максимум ${MAX_ACTIVE_MEETINGS} активных встреч одновременно` }
+      return { allowed: false, reason: `Максимум ${MAX_ACTIVE_MEETINGS} active meetings simultaneously` }
     }
 
     return { allowed: true, reason: null }
@@ -42,6 +69,9 @@ export async function getActiveCount(): Promise<number> {
      WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
   )
 
+  // Run guest cleanup
+  await cleanupGuests()
+
   const result = await pool.query(
     "SELECT COUNT(*) FROM meetings WHERE ended_at IS NULL",
   )
@@ -49,9 +79,27 @@ export async function getActiveCount(): Promise<number> {
 }
 
 export async function getParticipantCount(meetingId: string): Promise<number> {
-  const result = await pool.query(
-    'SELECT COUNT(*) FROM meeting_participants WHERE meeting_id = $1',
-    [meetingId],
+  // 1. Get livekit_room name
+  const meetingRes = await pool.query(
+    'SELECT livekit_room, ended_at FROM meetings WHERE id = $1',
+    [meetingId]
   )
-  return Number(result.rows[0].count)
+  const meeting = meetingRes.rows[0]
+  if (!meeting || meeting.ended_at) {
+    return 0
+  }
+
+  // 2. Count active participants in LiveKit
+  try {
+    const client = new RoomServiceClient(
+      getLiveKitUrl(),
+      process.env.LIVEKIT_API_KEY!,
+      process.env.LIVEKIT_API_SECRET!,
+    )
+    const participants = await client.listParticipants(meeting.livekit_room)
+    return participants.length
+  } catch (err) {
+    // If room doesn't exist yet or connection fails, default to 0
+    return 0
+  }
 }

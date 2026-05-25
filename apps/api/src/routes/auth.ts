@@ -189,8 +189,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
   // POST /api/auth/logout
   app.post('/logout', { onRequest: [app.authenticate] }, async (request, reply) => {
-    const user = request.user as { sub: string }
-    await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [user.sub])
+    const user = request.user as { sub: string; email?: string }
+    const isGuest = user.email?.endsWith('@guest.centras-echo.local')
+    if (isGuest) {
+      await pool.query('DELETE FROM users WHERE id = $1', [user.sub])
+    } else {
+      await pool.query('DELETE FROM refresh_tokens WHERE user_id = $1', [user.sub])
+    }
     return reply.send({ data: { success: true } })
   })
 

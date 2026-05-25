@@ -2,7 +2,50 @@ import type { FastifyPluginAsync } from 'fastify'
 import '@fastify/multipart'
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
+import { RoomServiceClient } from 'livekit-server-sdk'
 import { pool, runWithUser } from '../db/pool.js'
+import { cleanupGuests } from '../services/limits.js'
+
+const getLiveKitUrl = (): string => {
+  const url = process.env.LIVEKIT_URL || ''
+  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
+    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
+  }
+  return url
+}
+
+let lkClient: RoomServiceClient | null = null
+const getLkClient = () => {
+  if (!lkClient) {
+    lkClient = new RoomServiceClient(
+      getLiveKitUrl(),
+      process.env.LIVEKIT_API_KEY!,
+      process.env.LIVEKIT_API_SECRET!,
+    )
+  }
+  return lkClient
+}
+
+async function getActiveParticipants(livekitRoom: string): Promise<any[]> {
+  try {
+    const client = getLkClient()
+    const participants = await client.listParticipants(livekitRoom)
+    if (!participants || participants.length === 0) {
+      return []
+    }
+    const identities = participants.map((p) => p.identity)
+    const result = await pool.query(
+      `SELECT id AS "userId", name, avatar_url AS "avatarUrl"
+       FROM users
+       WHERE id = ANY($1::uuid[])`,
+      [identities]
+    )
+    return result.rows
+  } catch (err) {
+    return []
+  }
+}
+
 
 const CreateMeetingSchema = z.object({
   title: z.string().min(1).max(200),
@@ -68,6 +111,9 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
          WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
       )
 
+      // Run guest cleanup
+      await cleanupGuests()
+
       const result = await runWithUser(user.sub, (client) =>
         client.query(
           `SELECT
@@ -99,7 +145,16 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         )
       )
 
-      return reply.send({ data: result.rows })
+      const meetings = result.rows
+      await Promise.all(
+        meetings.map(async (m: any) => {
+          if (!m.endedAt) {
+            m.participants = await getActiveParticipants(m.livekitRoom)
+          }
+        })
+      )
+
+      return reply.send({ data: meetings })
     })
 
     // POST /api/meetings
@@ -117,6 +172,9 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
              duration_sec = 1800
          WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
       )
+
+      // Run guest cleanup
+      await cleanupGuests()
 
       const { title, scheduledStart, isPublic, waitingRoomEnabled } = body.data
       const roomName = `centras-${randomUUID()}`
@@ -157,6 +215,9 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         [id]
       )
 
+      // Run guest cleanup
+      await cleanupGuests()
+
       const result = await runWithUser(user.sub, (client) =>
         client.query(
           `SELECT
@@ -189,7 +250,12 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
       }
 
-      return reply.send({ data: result.rows[0] })
+      const m = result.rows[0]
+      if (m && !m.endedAt) {
+        m.participants = await getActiveParticipants(m.livekitRoom)
+      }
+
+      return reply.send({ data: m })
     })
 
     // POST /api/meetings/:id/join — record participant join
@@ -313,6 +379,9 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         'UPDATE meetings SET ended_at = NOW(), duration_sec = $1 WHERE id = $2',
         [durationSec, id],
       )
+
+      // Run guest cleanup
+      await cleanupGuests()
 
       return reply.send({ data: { ended: true, durationSec } })
     })
