@@ -586,14 +586,6 @@ export default function RoomPage() {
       connectOptions={{
         autoSubscribe: true,
         peerConnectionTimeout: 15000,
-        rtcConfig: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-            { urls: 'stun:stun.livekit.host:19302' }
-          ]
-        }
       }}
       onDisconnected={() => {
         if (isLeavingRef.current) {

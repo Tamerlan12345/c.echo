@@ -39,6 +39,15 @@ async function apiFetch<T>(
 ): Promise<ApiResult<T>> {
   const { skipRedirect = false, ...fetchOptions } = options
   const token = getAccessToken()
+  const refreshToken = getRefreshToken()
+
+  // Prevent sending requests that are guaranteed to return 401 when no credentials exist
+  if (!token && !refreshToken) {
+    const isPublic = path.includes('/public-info') || path.includes('/login') || path.includes('/guest') || path.includes('/google') || path.includes('/refresh')
+    if (!isPublic) {
+      return { error: { code: 'UNAUTHORIZED', message: 'No credentials' } }
+    }
+  }
 
   const headers: Record<string, string> = {}
   if (fetchOptions.body !== undefined && !(fetchOptions.body instanceof FormData)) {
