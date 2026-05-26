@@ -1164,6 +1164,8 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null)
   const activeSourcesRef = useRef<Map<string, MediaStreamAudioSourceNode>>(new Map())
+  const lastTranslateTimeRef = useRef<number>(0)
+  const interimTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Timer
   const [elapsed, setElapsed] = useState(0)
@@ -1391,63 +1393,98 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
 
       const srcL = translateInputLang === 'auto' ? 'ru' : translateInputLang
       const dstL = translateTargetLang
-
-      let translated = activeText
-      if (srcL !== dstL && dstL !== 'none') {
-        try {
-          const transRes = await meetingsApi.translate(activeText, srcL, dstL)
-          if ('data' in transRes && transRes.data?.translated) {
-            translated = transRes.data.translated
-          }
-        } catch (e) {
-          console.error('Translation failed:', e)
-        }
-      }
-
       const isFinal = !!finalTranscript
 
-      if (localParticipant) {
-        try {
-          const encoder = new TextEncoder()
-          const payload = encoder.encode(
-            JSON.stringify({
-              type: 'senti_translation',
+      const performTranslation = async (textToTranslate: string, finalFlag: boolean) => {
+        let translated = textToTranslate
+        if (srcL !== dstL && dstL !== 'none') {
+          try {
+            const transRes = await meetingsApi.translate(textToTranslate, srcL, dstL)
+            if ('data' in transRes && transRes.data?.translated) {
+              translated = transRes.data.translated
+            }
+          } catch (e) {
+            console.error('Translation failed:', e)
+          }
+        }
+
+        if (localParticipant) {
+          try {
+            const encoder = new TextEncoder()
+            const payload = encoder.encode(
+              JSON.stringify({
+                type: 'senti_translation',
+                srcLang: srcL,
+                srcText: textToTranslate,
+                dstLang: dstL,
+                dstText: translated,
+                isFinal: finalFlag,
+              })
+            )
+            await localParticipant.publishData(payload, { reliable: true })
+          } catch (e) {
+            console.error('Failed to broadcast translation:', e)
+          }
+        }
+
+        if (finalFlag) {
+          setTranslateHistory((prev) => [
+            ...prev,
+            {
+              id: Math.random().toString(36).substr(2, 9),
+              userId: localParticipant?.identity || 'local',
+              userName: localParticipant?.name || user.name || 'Вы',
               srcLang: srcL,
-              srcText: activeText,
+              srcText: textToTranslate,
               dstLang: dstL,
               dstText: translated,
-              isFinal,
-            })
-          )
-          await localParticipant.publishData(payload, { reliable: true })
-        } catch (e) {
-          console.error('Failed to broadcast translation:', e)
+              timestamp: Date.now(),
+            },
+          ])
+          setActiveSubtitle(null)
+        } else {
+          setActiveSubtitle({
+            userName: localParticipant?.name || user.name || 'Вы',
+            srcLang: srcL,
+            srcText: textToTranslate,
+            dstLang: dstL,
+            dstText: translated,
+          })
         }
       }
 
       if (isFinal) {
-        setTranslateHistory((prev) => [
-          ...prev,
-          {
-            id: Math.random().toString(36).substr(2, 9),
-            userId: localParticipant?.identity || 'local',
+        if (interimTimeoutRef.current) {
+          clearTimeout(interimTimeoutRef.current)
+          interimTimeoutRef.current = null
+        }
+        await performTranslation(activeText, true)
+      } else {
+        const now = Date.now()
+        // Throttle interim translations to avoid DDOSing translate API
+        if (now - lastTranslateTimeRef.current > 1200) {
+          lastTranslateTimeRef.current = now
+          await performTranslation(activeText, false)
+        } else {
+          // Responsive local feedback: update local subtitle overlay with original text immediately
+          setActiveSubtitle({
             userName: localParticipant?.name || user.name || 'Вы',
             srcLang: srcL,
             srcText: activeText,
             dstLang: dstL,
-            dstText: translated,
-            timestamp: Date.now(),
-          },
-        ])
-        setActiveSubtitle(null)
-      } else {
-        setActiveSubtitle({
-          userName: localParticipant?.name || user.name || 'Вы',
-          srcLang: srcL,
-          srcText: activeText,
-          dstLang: dstL,
-          dstText: translated,
-        })
+            dstText: activeText,
+          })
+          // Schedule a delayed catchup translation at the end of speech pauses
+          if (interimTimeoutRef.current) {
+            clearTimeout(interimTimeoutRef.current)
+          }
+          interimTimeoutRef.current = setTimeout(async () => {
+            if (active) {
+              lastTranslateTimeRef.current = Date.now()
+              await performTranslation(activeText, false)
+            }
+          }, 1200)
+        }
       }
     }
 
@@ -1967,6 +2004,22 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
   const liveConsentTotal = liveConsentParticipants.length
   const liveConsented = liveConsentParticipants.filter((p) => p.hasConsented).length
   const liveAllConsented = liveConsentTotal > 0 && liveConsented === liveConsentTotal
+  // WebRTC unmount cleanup for any active recording listeners
+  useEffect(() => {
+    return () => {
+      if ((window as any)._onTrackSubscribed) {
+        room.off(RoomEvent.TrackSubscribed, (window as any)._onTrackSubscribed)
+        ;(window as any)._onTrackSubscribed = null
+      }
+      if ((window as any)._onTrackUnsubscribed) {
+        room.off(RoomEvent.TrackUnsubscribed, (window as any)._onTrackUnsubscribed)
+        ;(window as any)._onTrackUnsubscribed = null
+      }
+      if (interimTimeoutRef.current) {
+        clearTimeout(interimTimeoutRef.current)
+      }
+    }
+  }, [room])
 
   return (
     <div className={styles.roomLayout}>

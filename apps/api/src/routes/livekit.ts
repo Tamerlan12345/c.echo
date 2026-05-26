@@ -111,14 +111,6 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
       })
     }
 
-    // Enforce global active meetings limit (on join, not create)
-    const activeCount = await getActiveCount()
-    if (activeCount > MAX_ACTIVE_MEETINGS) {
-      return reply.status(429).send({
-        error: { code: 'TOO_MANY_MEETINGS', message: `Максимум ${MAX_ACTIVE_MEETINGS} одновременных встреч` },
-      })
-    }
-
     // Build LiveKit access token
     const at = new AccessToken(
       process.env.LIVEKIT_API_KEY!,

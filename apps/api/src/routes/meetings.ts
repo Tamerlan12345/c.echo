@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { RoomServiceClient } from 'livekit-server-sdk'
 import { pool, runWithUser } from '../db/pool.js'
-import { cleanupGuests } from '../services/limits.js'
+import { runThrottledCleanup, MAX_ACTIVE_MEETINGS } from '../services/limits.js'
 
 const getLiveKitUrl = (): string => {
   const url = process.env.LIVEKIT_URL || ''
@@ -103,16 +103,8 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
     app.get('/', async (request, reply) => {
       const user = request.user as { sub: string }
 
-      // Auto-close meetings that are active but created more than 2 hours ago
-      await pool.query(
-        `UPDATE meetings 
-         SET ended_at = created_at + INTERVAL '30 minutes',
-             duration_sec = 1800
-         WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
-      )
-
-      // Run guest cleanup
-      await cleanupGuests()
+      // Run guest and inactive room cleanup in the background asynchronously
+      runThrottledCleanup()
 
       const result = await runWithUser(user.sub, (client) =>
         client.query(
@@ -165,16 +157,22 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: body.error.message } })
       }
 
-      // Auto-close meetings that are active but created more than 2 hours ago
-      await pool.query(
-        `UPDATE meetings 
-         SET ended_at = created_at + INTERVAL '30 minutes',
-             duration_sec = 1800
-         WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
+      // Enforce active meetings limit for this user before creation
+      const activeCount = await pool.query(
+        "SELECT COUNT(*) FROM meetings WHERE ended_at IS NULL AND creator_id = $1",
+        [user.sub],
       )
+      if (Number(activeCount.rows[0].count) >= MAX_ACTIVE_MEETINGS) {
+        return reply.status(429).send({
+          error: {
+            code: 'LIMIT_EXCEEDED',
+            message: `Превышен лимит активных встреч. У вас может быть не более ${MAX_ACTIVE_MEETINGS} активных встреч одновременно.`,
+          },
+        })
+      }
 
-      // Run guest cleanup
-      await cleanupGuests()
+      // Run guest and inactive room cleanup in the background asynchronously
+      runThrottledCleanup()
 
       const { title, scheduledStart, isPublic, waitingRoomEnabled } = body.data
       const roomName = `centras-${randomUUID()}`
@@ -206,17 +204,8 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Access denied' } })
       }
 
-      // Auto-close if needed before checking
-      await pool.query(
-        `UPDATE meetings 
-         SET ended_at = created_at + INTERVAL '30 minutes',
-             duration_sec = 1800
-         WHERE id = $1 AND ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`,
-        [id]
-      )
-
-      // Run guest cleanup
-      await cleanupGuests()
+      // Run guest and inactive room cleanup in the background asynchronously
+      runThrottledCleanup()
 
       const result = await runWithUser(user.sub, (client) =>
         client.query(
@@ -380,8 +369,8 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         [durationSec, id],
       )
 
-      // Run guest cleanup
-      await cleanupGuests()
+      // Run guest and inactive room cleanup in the background
+      runThrottledCleanup()
 
       return reply.send({ data: { ended: true, durationSec } })
     })

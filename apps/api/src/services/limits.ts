@@ -15,6 +15,8 @@ const getLiveKitUrl = (): string => {
   return url
 }
 
+let lastCleanupTime = 0
+
 export async function cleanupGuests(): Promise<void> {
   await pool.query(`
     DELETE FROM users
@@ -34,6 +36,29 @@ export async function cleanupGuests(): Promise<void> {
           AND m.ended_at IS NULL
       )
   `)
+}
+
+export async function runThrottledCleanup(): Promise<void> {
+  const now = Date.now()
+  if (now - lastCleanupTime < 60000) {
+    return
+  }
+  lastCleanupTime = now
+
+  // Run cleanup asynchronously in the background so it doesn't block critical read API paths
+  ;(async () => {
+    try {
+      await pool.query(
+        `UPDATE meetings 
+         SET ended_at = created_at + INTERVAL '30 minutes',
+             duration_sec = 1800
+         WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
+      )
+      await cleanupGuests()
+    } catch (err) {
+      console.error('Background DB cleanup failed:', err)
+    }
+  })()
 }
 
 export const limitsRoutes: FastifyPluginAsync = async (app) => {
@@ -61,16 +86,8 @@ export const limitsRoutes: FastifyPluginAsync = async (app) => {
 
 // System-wide active meetings check (for global limit)
 export async function getActiveCount(): Promise<number> {
-  // Auto-close meetings that are active but created more than 2 hours ago
-  await pool.query(
-    `UPDATE meetings 
-     SET ended_at = created_at + INTERVAL '30 minutes',
-         duration_sec = 1800
-     WHERE ended_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'`
-  )
-
-  // Run guest cleanup
-  await cleanupGuests()
+  // Trigger cleanup in background without blocking the query response
+  await runThrottledCleanup()
 
   const result = await pool.query(
     "SELECT COUNT(*) FROM meetings WHERE ended_at IS NULL",
@@ -103,3 +120,4 @@ export async function getParticipantCount(meetingId: string): Promise<number> {
     return 0
   }
 }
+
