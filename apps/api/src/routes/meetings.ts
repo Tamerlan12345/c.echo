@@ -489,6 +489,30 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ data: { success: true, sentiStatus: 'processing' } })
     })
 
+    // POST /api/meetings/translate — translate text via Google Translate proxy
+    app.post('/translate', async (request, reply) => {
+      const { text, srcLang, dstLang } = request.body as { text: string; srcLang: string; dstLang: string }
+      if (!text) {
+        return reply.status(400).send({ error: { code: 'MISSING_TEXT', message: 'text is required' } })
+      }
+
+      const sl = srcLang || 'auto'
+      const tl = dstLang || 'en'
+
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`
+        const res = await fetch(url)
+        if (!res.ok) {
+          throw new Error('Google Translate API error')
+        }
+        const json = await res.json() as any
+        const translated = json[0].map((item: any) => item[0]).join('')
+        return reply.send({ data: { translated } })
+      } catch (err: any) {
+        return reply.status(500).send({ error: { code: 'TRANSLATION_FAILED', message: err.message } })
+      }
+    })
+
     // ─── Waiting Room Routes ────────────────────────────────────────────────
     
     app.get('/:id/waiting-room/status', async (request, reply) => {

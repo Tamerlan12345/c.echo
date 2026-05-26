@@ -1353,30 +1353,45 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
           setMessages((prev) => [...prev, newMsg])
           if (!showChat) setUnreadCount((c) => c + 1)
         } else if (data.type === 'senti_translation') {
-          if (data.isFinal) {
-            setTranslateHistory((prev) => [
-              ...prev,
-              {
-                id: Math.random().toString(36).substr(2, 9),
-                userId: participant?.identity || 'unknown',
+          const runRemoteTranslation = async () => {
+            let finalDstText = data.dstText
+            if (translateTargetLang !== 'none' && data.dstLang !== translateTargetLang) {
+              try {
+                const transRes = await meetingsApi.translate(data.srcText, data.srcLang, translateTargetLang)
+                if ('data' in transRes && transRes.data?.translated) {
+                  finalDstText = transRes.data.translated
+                }
+              } catch (e) {
+                console.error('Remote translation failed:', e)
+              }
+            }
+
+            if (data.isFinal) {
+              setTranslateHistory((prev) => [
+                ...prev,
+                {
+                  id: Math.random().toString(36).substr(2, 9),
+                  userId: participant?.identity || 'unknown',
+                  userName: participant?.name || 'Участник',
+                  srcLang: data.srcLang,
+                  srcText: data.srcText,
+                  dstLang: translateTargetLang,
+                  dstText: finalDstText,
+                  timestamp: Date.now(),
+                },
+              ])
+              setActiveSubtitle(null)
+            } else {
+              setActiveSubtitle({
                 userName: participant?.name || 'Участник',
                 srcLang: data.srcLang,
                 srcText: data.srcText,
-                dstLang: data.dstLang,
-                dstText: data.dstText,
-                timestamp: Date.now(),
-              },
-            ])
-            setActiveSubtitle(null)
-          } else {
-            setActiveSubtitle({
-              userName: participant?.name || 'Участник',
-              srcLang: data.srcLang,
-              srcText: data.srcText,
-              dstLang: data.dstLang,
-              dstText: data.dstText,
-            })
+                dstLang: translateTargetLang,
+                dstText: finalDstText,
+              })
+            }
           }
+          runRemoteTranslation()
         }
       } catch (err) {
         console.error('Failed to parse data channel message:', err)
@@ -1397,7 +1412,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       room.off(RoomEvent.DataReceived, handleDataReceived)
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
     }
-  }, [room, isHost, pollConsent, showChat, localParticipant])
+  }, [room, isHost, pollConsent, showChat, localParticipant, translateTargetLang])
 
   // ─── Senti Translate (BETA) Audio Recognition & Simulation ───
   const recognitionRef = useRef<any>(null)
@@ -1449,7 +1464,18 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       const srcL = translateInputLang === 'auto' ? 'ru' : translateInputLang
       const dstL = translateTargetLang
 
-      const translated = mockTranslate(activeText, srcL, dstL)
+      let translated = activeText
+      if (srcL !== dstL && dstL !== 'none') {
+        try {
+          const transRes = await meetingsApi.translate(activeText, srcL, dstL)
+          if ('data' in transRes && transRes.data?.translated) {
+            translated = transRes.data.translated
+          }
+        } catch (e) {
+          console.error('Translation failed:', e)
+        }
+      }
+
       const isFinal = !!finalTranscript
 
       if (localParticipant) {
@@ -1575,10 +1601,22 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
     let phraseIndex = 0
     let typingInterval: NodeJS.Timeout | null = null
 
-    const runSimulationStep = () => {
+    const runSimulationStep = async () => {
       if (typingInterval) clearInterval(typingInterval)
       const phrase = demoPhrases[phraseIndex % demoPhrases.length]
       phraseIndex++
+
+      let targetText = translateTargetLang === 'none' ? phrase.srcText : phrase.dstText
+      if (phrase.srcLang !== translateTargetLang && translateTargetLang !== 'none') {
+        try {
+          const transRes = await meetingsApi.translate(phrase.srcText, phrase.srcLang, translateTargetLang)
+          if ('data' in transRes && transRes.data?.translated) {
+            targetText = transRes.data.translated
+          }
+        } catch (e) {
+          console.error('Simulation translation failed, using fallback:', e)
+        }
+      }
 
       const words = phrase.srcText.split(' ')
       let currentWordIndex = 1
@@ -1602,7 +1640,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
               srcLang: phrase.srcLang,
               srcText: phrase.srcText,
               dstLang: translateTargetLang,
-              dstText: translateTargetLang === 'none' ? phrase.srcText : phrase.dstText,
+              dstText: targetText,
               timestamp: Date.now(),
             }
           ])
@@ -1610,14 +1648,14 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
         }
 
         const partialSrcText = words.slice(0, currentWordIndex).join(' ')
-        const partialDstText = phrase.dstText.split(' ').slice(0, Math.ceil(currentWordIndex * (phrase.dstText.split(' ').length / words.length))).join(' ')
+        const partialDstText = targetText.split(' ').slice(0, Math.ceil(currentWordIndex * (targetText.split(' ').length / words.length))).join(' ')
         
         setActiveSubtitle({
           userName: phrase.speaker,
           srcLang: phrase.srcLang,
           srcText: partialSrcText,
           dstLang: translateTargetLang,
-          dstText: translateTargetLang === 'none' ? partialSrcText : partialDstText,
+          dstText: partialDstText,
         })
         
         currentWordIndex++

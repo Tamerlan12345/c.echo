@@ -201,6 +201,12 @@ export const meetingsApi = {
       method: 'POST',
       body: JSON.stringify({ newHostId }),
     }),
+
+  translate: (text: string, srcLang: string, dstLang: string) =>
+    apiFetch<{ translated: string }>('/api/meetings/translate', {
+      method: 'POST',
+      body: JSON.stringify({ text, srcLang, dstLang }),
+    }),
 }
 
 // ─── Consent ──────────────────────────────────────────────────────────────────
