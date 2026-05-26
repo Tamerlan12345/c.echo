@@ -982,6 +982,82 @@ function PreJoinScreen({
   )
 }
 
+// ─── Senti Translate Mock Translation Helper ────────────────────────────────────
+
+const mockTranslate = (text: string, src: string, dst: string): string => {
+  if (src === dst || dst === 'none') return text
+  
+  const textClean = text.trim().toLowerCase()
+  
+  const ruToEn: Record<string, string> = {
+    'всем привет': 'Hello everyone',
+    'рад вас видеть': 'glad to see you',
+    'как дела': 'how are you doing',
+    'давайте начнем': 'let\'s get started',
+    'демонстрация экрана': 'screen sharing',
+    'вы меня слышите': 'can you hear me',
+    'отличная идея': 'great idea',
+    'согласен': 'agree',
+    'микрофон': 'microphone',
+    'камера': 'camera',
+    'встреча': 'meeting',
+    'проект': 'project',
+    'завтра': 'tomorrow',
+    'спасибо': 'thank you',
+  }
+  
+  const enToRu: Record<string, string> = {
+    'hello everyone': 'Всем привет',
+    'glad to see you': 'рад вас видеть',
+    'how are you doing': 'как дела',
+    'let\'s get started': 'давайте начнем',
+    'screen sharing': 'демонстрация экрана',
+    'can you hear me': 'вы меня слышите',
+    'great idea': 'отличная идея',
+    'agree': 'согласен',
+    'microphone': 'микрофон',
+    'camera': 'камера',
+    'meeting': 'встреча',
+    'project': 'проект',
+    'tomorrow': 'завтра',
+    'thank you': 'спасибо',
+  }
+
+  if (src === 'ru' && dst === 'en') {
+    for (const [key, val] of Object.entries(ruToEn)) {
+      if (textClean.includes(key)) return val
+    }
+    // Context-sensitive translation simulation
+    if (textClean.includes('дизайн')) return 'Colleagues, we need to approve the design system by Friday.'
+    if (textClean.includes('секретар')) return 'Let\'s also connect the AI secretary to write down tasks.'
+    return text + ' (Translated to English)'
+  }
+
+  if (src === 'en' && dst === 'ru') {
+    for (const [key, val] of Object.entries(enToRu)) {
+      if (textClean.includes(key)) return val
+    }
+    if (textClean.includes('sense')) return 'Это имеет смысл. Я могу подготовить макет интерфейса сегодня.'
+    return text + ' (Переведено на русский)'
+  }
+
+  if (dst === 'kk') {
+    if (textClean.includes('отличн') || textClean.includes('perfect') || textClean.includes('great')) {
+      return 'Керемет! Мен деректер базасының кестесін тексеремін.'
+    }
+    return text + ' (Қазақ тіліне аударылды)'
+  }
+  
+  if (dst === 'es') {
+    if (textClean.includes('идеал') || textClean.includes('perfect')) {
+      return '¡Perfecto! Yo revisaré los requisitos de seguridad mañana.'
+    }
+    return text + ' (Traducido al español)'
+  }
+
+  return text + ` [➔ ${dst.toUpperCase()}]`
+}
+
 // ─── Inner room (has access to LiveKit context) ────────────────────────────────
 
 interface RoomInnerProps {
@@ -1028,6 +1104,42 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
   const [showChat, setShowChat] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [roomCopied, setRoomCopied] = useState(false)
+
+  // Senti Translate (BETA) states
+  const [showTranslate, setShowTranslate] = useState(false)
+  const [isTranslateActive, setIsTranslateActive] = useState(false)
+  const [translateInputLang, setTranslateInputLang] = useState('auto')
+  const [translateTargetLang, setTranslateTargetLang] = useState('ru')
+  const [translateHistory, setTranslateHistory] = useState<Array<{
+    id: string
+    userId: string
+    userName: string
+    srcLang: string
+    srcText: string
+    dstLang: string
+    dstText: string
+    timestamp: number
+  }>>([])
+  const [activeSubtitle, setActiveSubtitle] = useState<{
+    userName: string
+    srcLang: string
+    srcText: string
+    dstLang: string
+    dstText: string
+  } | null>(null)
+
+  const toggleTranslate = () => {
+    setShowTranslate((v) => {
+      const next = !v
+      if (next) {
+        setShowChat(false)
+        setShowSenti(false)
+        setShowParticipants(false)
+        setShowMoreMenu(false)
+      }
+      return next
+    })
+  }
 
   const handleCopyRoomInvite = () => {
     if (typeof window !== 'undefined') {
@@ -1240,6 +1352,31 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
           }
           setMessages((prev) => [...prev, newMsg])
           if (!showChat) setUnreadCount((c) => c + 1)
+        } else if (data.type === 'senti_translation') {
+          if (data.isFinal) {
+            setTranslateHistory((prev) => [
+              ...prev,
+              {
+                id: Math.random().toString(36).substr(2, 9),
+                userId: participant?.identity || 'unknown',
+                userName: participant?.name || 'Участник',
+                srcLang: data.srcLang,
+                srcText: data.srcText,
+                dstLang: data.dstLang,
+                dstText: data.dstText,
+                timestamp: Date.now(),
+              },
+            ])
+            setActiveSubtitle(null)
+          } else {
+            setActiveSubtitle({
+              userName: participant?.name || 'Участник',
+              srcLang: data.srcLang,
+              srcText: data.srcText,
+              dstLang: data.dstLang,
+              dstText: data.dstText,
+            })
+          }
         }
       } catch (err) {
         console.error('Failed to parse data channel message:', err)
@@ -1261,6 +1398,241 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
     }
   }, [room, isHost, pollConsent, showChat, localParticipant])
+
+  // ─── Senti Translate (BETA) Audio Recognition & Simulation ───
+  const recognitionRef = useRef<any>(null)
+
+  // Local user speech recognition via Web Speech API
+  useEffect(() => {
+    if (!isTranslateActive) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {}
+        recognitionRef.current = null
+      }
+      setActiveSubtitle(null)
+      return
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      console.warn('SpeechRecognition is not supported in this browser.')
+      return
+    }
+
+    const rec = new SpeechRecognition()
+    rec.continuous = true
+    rec.interimResults = true
+    
+    let langTag = 'ru-RU'
+    if (translateInputLang === 'en') langTag = 'en-US'
+    else if (translateInputLang === 'es') langTag = 'es-ES'
+    else if (translateInputLang === 'kk') langTag = 'kk-KZ'
+    rec.lang = langTag
+
+    rec.onresult = async (event: any) => {
+      let interimTranscript = ''
+      let finalTranscript = ''
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript
+        } else {
+          interimTranscript += event.results[i][0].transcript
+        }
+      }
+
+      const activeText = finalTranscript || interimTranscript
+      if (!activeText.trim()) return
+
+      const srcL = translateInputLang === 'auto' ? 'ru' : translateInputLang
+      const dstL = translateTargetLang
+
+      const translated = mockTranslate(activeText, srcL, dstL)
+      const isFinal = !!finalTranscript
+
+      if (localParticipant) {
+        try {
+          const encoder = new TextEncoder()
+          const payload = encoder.encode(
+            JSON.stringify({
+              type: 'senti_translation',
+              srcLang: srcL,
+              srcText: activeText,
+              dstLang: dstL,
+              dstText: translated,
+              isFinal,
+            })
+          )
+          await localParticipant.publishData(payload, { reliable: true })
+        } catch (e) {
+          console.error('Failed to broadcast translation:', e)
+        }
+      }
+
+      if (isFinal) {
+        setTranslateHistory((prev) => [
+          ...prev,
+          {
+            id: Math.random().toString(36).substr(2, 9),
+            userId: localParticipant?.identity || 'local',
+            userName: localParticipant?.name || user.name || 'Вы',
+            srcLang: srcL,
+            srcText: activeText,
+            dstLang: dstL,
+            dstText: translated,
+            timestamp: Date.now(),
+          },
+        ])
+        setActiveSubtitle(null)
+      } else {
+        setActiveSubtitle({
+          userName: localParticipant?.name || user.name || 'Вы',
+          srcLang: srcL,
+          srcText: activeText,
+          dstLang: dstL,
+          dstText: translated,
+        })
+      }
+    }
+
+    rec.onerror = (e: any) => {
+      console.warn('SpeechRecognition error:', e)
+      if (e.error === 'no-speech' || e.error === 'aborted') {
+        try {
+          if (isTranslateActive) rec.start()
+        } catch (_) {}
+      }
+    }
+
+    rec.onend = () => {
+      if (isTranslateActive) {
+        try {
+          rec.start()
+        } catch (_) {}
+      }
+    }
+
+    try {
+      rec.start()
+      recognitionRef.current = rec
+    } catch (e) {
+      console.error('Speech recognition failed to start:', e)
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {}
+      }
+    }
+  }, [isTranslateActive, translateInputLang, translateTargetLang, localParticipant])
+
+  // Multi-user dialog simulation for demo mode (runs when translation is active)
+  useEffect(() => {
+    if (!isTranslateActive) return
+
+    const demoPhrases = [
+      {
+        speaker: 'Асель Искакова',
+        srcLang: 'ru',
+        srcText: 'Коллеги, нам нужно согласовать дизайн-систему до пятницы.',
+        dstLang: 'en',
+        dstText: 'Colleagues, we need to approve the design system by Friday.',
+      },
+      {
+        speaker: 'John Davis',
+        srcLang: 'en',
+        srcText: 'That makes sense. I can prepare the layout mockup today.',
+        dstLang: 'ru',
+        dstText: 'Это имеет смысл. Я могу подготовить макет интерфейса сегодня.',
+      },
+      {
+        speaker: 'Мадияр Оспанов',
+        srcLang: 'kk',
+        srcText: 'Керемет! Мен деректер базасының кестесін тексеремін.',
+        dstLang: 'ru',
+        dstText: 'Отлично! Я проверю структуру базы данных.',
+      },
+      {
+        speaker: 'Carlos Ruiz',
+        srcLang: 'es',
+        srcText: '¡Perfecto! Yo revisaré los requisitos de seguridad mañana.',
+        dstLang: 'ru',
+        dstText: 'Идеально! Я проверю требования безопасности завтра.',
+      },
+      {
+        speaker: 'Динара Алиева',
+        srcLang: 'ru',
+        srcText: 'Давайте еще подключим ИИ-секретаря для записи задач.',
+        dstLang: 'en',
+        dstText: 'Let\'s also connect the AI secretary to write down tasks.',
+      }
+    ]
+
+    let phraseIndex = 0
+    let typingInterval: NodeJS.Timeout | null = null
+
+    const runSimulationStep = () => {
+      if (typingInterval) clearInterval(typingInterval)
+      const phrase = demoPhrases[phraseIndex % demoPhrases.length]
+      phraseIndex++
+
+      const words = phrase.srcText.split(' ')
+      let currentWordIndex = 1
+      
+      typingInterval = setInterval(() => {
+        if (!isTranslateActive) {
+          if (typingInterval) clearInterval(typingInterval)
+          return
+        }
+
+        if (currentWordIndex > words.length) {
+          if (typingInterval) clearInterval(typingInterval)
+          setActiveSubtitle(null)
+          
+          setTranslateHistory((prev) => [
+            ...prev,
+            {
+              id: Math.random().toString(36).substr(2, 9),
+              userId: 'simulated-' + phrase.speaker.toLowerCase().replace(' ', '-'),
+              userName: phrase.speaker,
+              srcLang: phrase.srcLang,
+              srcText: phrase.srcText,
+              dstLang: translateTargetLang,
+              dstText: translateTargetLang === 'none' ? phrase.srcText : phrase.dstText,
+              timestamp: Date.now(),
+            }
+          ])
+          return
+        }
+
+        const partialSrcText = words.slice(0, currentWordIndex).join(' ')
+        const partialDstText = phrase.dstText.split(' ').slice(0, Math.ceil(currentWordIndex * (phrase.dstText.split(' ').length / words.length))).join(' ')
+        
+        setActiveSubtitle({
+          userName: phrase.speaker,
+          srcLang: phrase.srcLang,
+          srcText: partialSrcText,
+          dstLang: translateTargetLang,
+          dstText: translateTargetLang === 'none' ? partialSrcText : partialDstText,
+        })
+        
+        currentWordIndex++
+      }, 300)
+    }
+
+    const iv = setInterval(runSimulationStep, 14000)
+    const delayTimeout = setTimeout(runSimulationStep, 3000)
+
+    return () => {
+      clearInterval(iv)
+      clearTimeout(delayTimeout)
+      if (typingInterval) clearInterval(typingInterval)
+    }
+  }, [isTranslateActive, translateTargetLang])
 
   const handleMuteParticipant = async (targetIdentity: string) => {
     if (!localParticipant || !isHost) return
@@ -1904,6 +2276,29 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
               )
             })}
           </div>
+
+          {/* Senti Translate Subtitle Overlay */}
+          {isTranslateActive && activeSubtitle && (
+            <div className={styles.subtitlesOverlay}>
+              <div className={styles.subtitleBox}>
+                <div className={styles.subtitleSpeakerLine}>
+                  <span className={styles.subtitleSpeakerName}>{activeSubtitle.userName}</span>
+                  <span className={styles.subtitleLangDirection}>
+                    {activeSubtitle.srcLang.toUpperCase()}
+                    {activeSubtitle.dstLang !== 'none' && ` ➔ ${activeSubtitle.dstLang.toUpperCase()}`}
+                  </span>
+                </div>
+                {activeSubtitle.srcLang !== activeSubtitle.dstLang && activeSubtitle.dstLang !== 'none' ? (
+                  <>
+                    <p className={styles.subtitleOriginalText}>{activeSubtitle.srcText}</p>
+                    <p className={styles.subtitleTranslatedText}>{activeSubtitle.dstText}</p>
+                  </>
+                ) : (
+                  <p className={styles.subtitleTranslatedText}>{activeSubtitle.srcText}</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Controls */}
@@ -2111,6 +2506,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
                   onClick={() => {
                     setShowChat((v) => !v)
                     if (showSenti) setShowSenti(false)
+                    if (showTranslate) setShowTranslate(false)
                     setShowMoreMenu(false)
                     setShowParticipants(false)
                   }}
@@ -2123,13 +2519,31 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
                 )}
               </div>
             </Tooltip>
+            
+            <Tooltip label={showTranslate ? 'Закрыть перевод' : 'Открыть перевод (BETA)'}>
+              <button
+                id="toggle-translate-btn"
+                className={`${styles.controlBtn} ${showTranslate ? styles.active : ''} ${isTranslateActive ? styles.activeTranslateBtn : ''}`}
+                onClick={toggleTranslate}
+                aria-label="Перевод встречи"
+              >
+                <Globe size={20} />
+              </button>
+            </Tooltip>
+
             {isHost && (
               <div className={styles.desktopOnly}>
                 <Tooltip label={showSenti ? 'Закрыть Senti' : 'Открыть Senti-протокол'}>
                   <button
                     id="toggle-senti-btn"
                     className={`${styles.controlBtn} ${showSenti ? styles.sentiActive : ''}`}
-                    onClick={() => setShowSenti((v) => !v)}
+                    onClick={() => {
+                      setShowSenti((v) => !v)
+                      if (showChat) setShowChat(false)
+                      if (showTranslate) setShowTranslate(false)
+                      setShowMoreMenu(false)
+                      setShowParticipants(false)
+                    }}
                     aria-label="Senti протокол"
                   >
                     <Bot size={20} />
@@ -2367,6 +2781,118 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
         </aside>
       )}
 
+      {/* ── Senti Translate Panel ── */}
+      {showTranslate && (
+        <aside className={styles.translatePanel}>
+          <div className={styles.translateHeader}>
+            <div className={styles.translateTitle}>
+              <Globe size={18} color="var(--color-accent-blue)" />
+              <span>Senti Translate</span>
+              <span className={styles.translateBetaBadge}>BETA</span>
+            </div>
+            <button
+              className={styles.controlBtn}
+              style={{ width: 32, height: 32 }}
+              onClick={() => setShowTranslate(false)}
+              aria-label="Закрыть панель"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className={styles.translateBody}>
+            {/* Controls */}
+            <div className={styles.translateControls}>
+              <div className={styles.translateToggleRow}>
+                <span className={styles.translateToggleLabel}>Запустить перевод</span>
+                <label className={styles.translateSwitch}>
+                  <input
+                    type="checkbox"
+                    checked={isTranslateActive}
+                    onChange={(e) => setIsTranslateActive(e.target.checked)}
+                  />
+                  <span className={styles.translateSlider}></span>
+                </label>
+              </div>
+
+              {isTranslateActive && (
+                <div className={styles.translateLangSelects}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span className={styles.translateLangLabel}>Язык ввода (Источник):</span>
+                    <select
+                      className={styles.translateLangSelect}
+                      value={translateInputLang}
+                      onChange={(e) => setTranslateInputLang(e.target.value)}
+                    >
+                      <option value="auto">🌐 Автоопределение</option>
+                      <option value="ru">Русский (RU)</option>
+                      <option value="en">English (EN)</option>
+                      <option value="kk">Қазақша (KK)</option>
+                      <option value="es">Español (ES)</option>
+                    </select>
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span className={styles.translateLangLabel}>Язык вывода (Перевод):</span>
+                    <select
+                      className={styles.translateLangSelect}
+                      value={translateTargetLang}
+                      onChange={(e) => setTranslateTargetLang(e.target.value)}
+                    >
+                      <option value="none">Без перевода (Только субтитры)</option>
+                      <option value="ru">Русский (RU)</option>
+                      <option value="en">English (EN)</option>
+                      <option value="kk">Қазақша (KK)</option>
+                      <option value="es">Español (ES)</option>
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Translation History Section */}
+            <div className={styles.translateHistorySection}>
+              <span className={styles.translateHistoryTitle}>История перевода</span>
+              <div className={styles.translateHistoryFeed}>
+                {translateHistory.length === 0 ? (
+                  <div className={styles.translateFeedEmpty}>
+                    <Globe size={24} style={{ color: 'var(--color-text-muted)' }} />
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                      {isTranslateActive
+                        ? 'Ожидание речи... Начните говорить или подождите участников встречи.'
+                        : 'Включите переключатель "Запустить перевод" выше, чтобы активировать распознавание и трансляцию.'}
+                    </p>
+                  </div>
+                ) : (
+                  translateHistory.map((item) => (
+                    <div key={item.id} className={styles.translateHistoryItem}>
+                      <div className={styles.translateItemMeta}>
+                        <span className={styles.translateItemSpeaker}>
+                          {item.userName}
+                          <span className={styles.translateItemLangTag}>{item.srcLang.toUpperCase()}</span>
+                        </span>
+                        <span className={styles.translateItemTime}>
+                          {new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(item.timestamp))}
+                        </span>
+                      </div>
+                      
+                      {item.srcLang !== item.dstLang && item.dstLang !== 'none' ? (
+                        <>
+                          <p className={styles.translateItemOriginal}>{item.srcText}</p>
+                          <p className={styles.translateItemTranslated}>{item.dstText}</p>
+                        </>
+                      ) : (
+                        <p className={styles.translateItemTranslated}>{item.srcText}</p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+
       {/* ── Consent Modal ── */}
       {showConsentModal && (
         <div className="modal-overlay" onClick={() => setShowConsentModal(false)}>
@@ -2488,12 +3014,13 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       )}
 
       {/* ── Mobile Backdrop ── */}
-      {(showChat || showSenti || showParticipants || showMoreMenu) && (
+      {(showChat || showSenti || showTranslate || showParticipants || showMoreMenu) && (
         <div
           className={styles.mobileBackdrop}
           onClick={() => {
             setShowChat(false)
             setShowSenti(false)
+            setShowTranslate(false)
             setShowParticipants(false)
             setShowMoreMenu(false)
           }}
@@ -2591,6 +3118,20 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
                 <span className={styles.moreMenuBtnLabel}>Senti AI</span>
               </button>
             )}
+
+            {/* Senti Translate toggle */}
+            <button
+              className={`${styles.moreMenuBtn} ${showTranslate ? styles.moreMenuBtnActive : ''} ${isTranslateActive ? styles.moreMenuBtnActive : ''}`}
+              onClick={() => {
+                toggleTranslate()
+                setShowMoreMenu(false)
+              }}
+            >
+              <div className={styles.moreMenuIconWrapper}>
+                <Globe size={20} color="var(--color-accent-blue)" />
+              </div>
+              <span className={styles.moreMenuBtnLabel}>Перевод (BETA)</span>
+            </button>
 
             {/* Toggle View mode */}
             <button
