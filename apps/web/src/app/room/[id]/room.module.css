@@ -632,6 +632,24 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
+/* Align tooltips near screen edges to prevent layout clipping */
+.controlsLeft .tooltip {
+  left: 0;
+  transform: translateY(0);
+}
+.controlsLeft .tooltipWrapper:hover .tooltip {
+  transform: translateY(-4px);
+}
+
+.controlsRight .tooltip {
+  left: auto;
+  right: 0;
+  transform: translateY(0);
+}
+.controlsRight .tooltipWrapper:hover .tooltip {
+  transform: translateY(-4px);
+}
+
 /* ─── Chat Panel ─────────────────────────────────────────────────────────────── */
 
 .chatPanel {
@@ -1734,16 +1752,22 @@
 }
 
 .activeTranslateBtn {
-  background: var(--color-accent-blue-dim) !important;
-  border-color: rgba(0, 51, 160, 0.45) !important;
-  color: var(--color-accent-blue) !important;
-  box-shadow: var(--shadow-glow-blue) !important;
-  animation: pulse-translate-glow 2s infinite alternate;
+  background: linear-gradient(135deg, rgba(255, 30, 39, 0.12) 0%, rgba(168, 0, 111, 0.12) 50%, rgba(0, 71, 224, 0.12) 100%) !important;
+  border-color: #A8006F !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 15px rgba(168, 0, 111, 0.4) !important;
+  animation: pulse-translate-glow 2s infinite alternate !important;
 }
 
 @keyframes pulse-translate-glow {
-  from { box-shadow: 0 0 4px rgba(0, 51, 160, 0.2); }
-  to { box-shadow: 0 0 16px rgba(0, 51, 160, 0.55), 0 0 4px rgba(0, 51, 160, 0.2); }
+  from {
+    box-shadow: 0 0 4px rgba(168, 0, 111, 0.25), 0 0 0 1px rgba(0, 71, 224, 0.15);
+    border-color: rgba(168, 0, 111, 0.6);
+  }
+  to {
+    box-shadow: 0 0 18px rgba(168, 0, 111, 0.6), 0 0 10px rgba(0, 71, 224, 0.35);
+    border-color: rgba(0, 71, 224, 0.95);
+  }
 }
 
 .translatePanelBetaTitle {
