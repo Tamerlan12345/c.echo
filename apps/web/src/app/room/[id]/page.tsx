@@ -982,82 +982,6 @@ function PreJoinScreen({
   )
 }
 
-// ─── Senti Translate Mock Translation Helper ────────────────────────────────────
-
-const mockTranslate = (text: string, src: string, dst: string): string => {
-  if (src === dst || dst === 'none') return text
-  
-  const textClean = text.trim().toLowerCase()
-  
-  const ruToEn: Record<string, string> = {
-    'всем привет': 'Hello everyone',
-    'рад вас видеть': 'glad to see you',
-    'как дела': 'how are you doing',
-    'давайте начнем': 'let\'s get started',
-    'демонстрация экрана': 'screen sharing',
-    'вы меня слышите': 'can you hear me',
-    'отличная идея': 'great idea',
-    'согласен': 'agree',
-    'микрофон': 'microphone',
-    'камера': 'camera',
-    'встреча': 'meeting',
-    'проект': 'project',
-    'завтра': 'tomorrow',
-    'спасибо': 'thank you',
-  }
-  
-  const enToRu: Record<string, string> = {
-    'hello everyone': 'Всем привет',
-    'glad to see you': 'рад вас видеть',
-    'how are you doing': 'как дела',
-    'let\'s get started': 'давайте начнем',
-    'screen sharing': 'демонстрация экрана',
-    'can you hear me': 'вы меня слышите',
-    'great idea': 'отличная идея',
-    'agree': 'согласен',
-    'microphone': 'микрофон',
-    'camera': 'камера',
-    'meeting': 'встреча',
-    'project': 'проект',
-    'tomorrow': 'завтра',
-    'thank you': 'спасибо',
-  }
-
-  if (src === 'ru' && dst === 'en') {
-    for (const [key, val] of Object.entries(ruToEn)) {
-      if (textClean.includes(key)) return val
-    }
-    // Context-sensitive translation simulation
-    if (textClean.includes('дизайн')) return 'Colleagues, we need to approve the design system by Friday.'
-    if (textClean.includes('секретар')) return 'Let\'s also connect the AI secretary to write down tasks.'
-    return text + ' (Translated to English)'
-  }
-
-  if (src === 'en' && dst === 'ru') {
-    for (const [key, val] of Object.entries(enToRu)) {
-      if (textClean.includes(key)) return val
-    }
-    if (textClean.includes('sense')) return 'Это имеет смысл. Я могу подготовить макет интерфейса сегодня.'
-    return text + ' (Переведено на русский)'
-  }
-
-  if (dst === 'kk') {
-    if (textClean.includes('отличн') || textClean.includes('perfect') || textClean.includes('great')) {
-      return 'Керемет! Мен деректер базасының кестесін тексеремін.'
-    }
-    return text + ' (Қазақ тіліне аударылды)'
-  }
-  
-  if (dst === 'es') {
-    if (textClean.includes('идеал') || textClean.includes('perfect')) {
-      return '¡Perfecto! Yo revisaré los requisitos de seguridad mañana.'
-    }
-    return text + ' (Traducido al español)'
-  }
-
-  return text + ` [➔ ${dst.toUpperCase()}]`
-}
-
 // ─── Inner room (has access to LiveKit context) ────────────────────────────────
 
 interface RoomInnerProps {
@@ -1422,6 +1346,9 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
     if (!isTranslateActive) {
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.onend = null
+          recognitionRef.current.onerror = null
+          recognitionRef.current.onresult = null
           recognitionRef.current.stop()
         } catch (e) {}
         recognitionRef.current = null
@@ -1550,6 +1477,9 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
     return () => {
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.onend = null
+          recognitionRef.current.onerror = null
+          recognitionRef.current.onresult = null
           recognitionRef.current.stop()
         } catch (e) {}
       }
