@@ -1343,12 +1343,11 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
 
   // Local user speech recognition via Web Speech API
   useEffect(() => {
+    let active = true
+
     if (!isTranslateActive) {
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.onend = null
-          recognitionRef.current.onerror = null
-          recognitionRef.current.onresult = null
           recognitionRef.current.stop()
         } catch (e) {}
         recognitionRef.current = null
@@ -1374,6 +1373,8 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
     rec.lang = langTag
 
     rec.onresult = async (event: any) => {
+      if (!active) return
+
       let interimTranscript = ''
       let finalTranscript = ''
 
@@ -1452,19 +1453,19 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
 
     rec.onerror = (e: any) => {
       console.warn('SpeechRecognition error:', e)
+      if (!active) return
       if (e.error === 'no-speech' || e.error === 'aborted') {
         try {
-          if (isTranslateActive) rec.start()
+          rec.start()
         } catch (_) {}
       }
     }
 
     rec.onend = () => {
-      if (isTranslateActive) {
-        try {
-          rec.start()
-        } catch (_) {}
-      }
+      if (!active) return
+      try {
+        rec.start()
+      } catch (_) {}
     }
 
     try {
@@ -1475,6 +1476,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
     }
 
     return () => {
+      active = false
       if (recognitionRef.current) {
         try {
           recognitionRef.current.onend = null
@@ -1482,125 +1484,12 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
           recognitionRef.current.onresult = null
           recognitionRef.current.stop()
         } catch (e) {}
+        recognitionRef.current = null
       }
     }
   }, [isTranslateActive, translateInputLang, translateTargetLang, localParticipant])
 
-  // Multi-user dialog simulation for demo mode (runs when translation is active)
-  useEffect(() => {
-    if (!isTranslateActive) return
 
-    const demoPhrases = [
-      {
-        speaker: 'Асель Искакова',
-        srcLang: 'ru',
-        srcText: 'Коллеги, нам нужно согласовать дизайн-систему до пятницы.',
-        dstLang: 'en',
-        dstText: 'Colleagues, we need to approve the design system by Friday.',
-      },
-      {
-        speaker: 'John Davis',
-        srcLang: 'en',
-        srcText: 'That makes sense. I can prepare the layout mockup today.',
-        dstLang: 'ru',
-        dstText: 'Это имеет смысл. Я могу подготовить макет интерфейса сегодня.',
-      },
-      {
-        speaker: 'Мадияр Оспанов',
-        srcLang: 'kk',
-        srcText: 'Керемет! Мен деректер базасының кестесін тексеремін.',
-        dstLang: 'ru',
-        dstText: 'Отлично! Я проверю структуру базы данных.',
-      },
-      {
-        speaker: 'Carlos Ruiz',
-        srcLang: 'es',
-        srcText: '¡Perfecto! Yo revisaré los requisitos de seguridad mañana.',
-        dstLang: 'ru',
-        dstText: 'Идеально! Я проверю требования безопасности завтра.',
-      },
-      {
-        speaker: 'Динара Алиева',
-        srcLang: 'ru',
-        srcText: 'Давайте еще подключим ИИ-секретаря для записи задач.',
-        dstLang: 'en',
-        dstText: 'Let\'s also connect the AI secretary to write down tasks.',
-      }
-    ]
-
-    let phraseIndex = 0
-    let typingInterval: NodeJS.Timeout | null = null
-
-    const runSimulationStep = async () => {
-      if (typingInterval) clearInterval(typingInterval)
-      const phrase = demoPhrases[phraseIndex % demoPhrases.length]
-      phraseIndex++
-
-      let targetText = translateTargetLang === 'none' ? phrase.srcText : phrase.dstText
-      if (phrase.srcLang !== translateTargetLang && translateTargetLang !== 'none') {
-        try {
-          const transRes = await meetingsApi.translate(phrase.srcText, phrase.srcLang, translateTargetLang)
-          if ('data' in transRes && transRes.data?.translated) {
-            targetText = transRes.data.translated
-          }
-        } catch (e) {
-          console.error('Simulation translation failed, using fallback:', e)
-        }
-      }
-
-      const words = phrase.srcText.split(' ')
-      let currentWordIndex = 1
-      
-      typingInterval = setInterval(() => {
-        if (!isTranslateActive) {
-          if (typingInterval) clearInterval(typingInterval)
-          return
-        }
-
-        if (currentWordIndex > words.length) {
-          if (typingInterval) clearInterval(typingInterval)
-          setActiveSubtitle(null)
-          
-          setTranslateHistory((prev) => [
-            ...prev,
-            {
-              id: Math.random().toString(36).substr(2, 9),
-              userId: 'simulated-' + phrase.speaker.toLowerCase().replace(' ', '-'),
-              userName: phrase.speaker,
-              srcLang: phrase.srcLang,
-              srcText: phrase.srcText,
-              dstLang: translateTargetLang,
-              dstText: targetText,
-              timestamp: Date.now(),
-            }
-          ])
-          return
-        }
-
-        const partialSrcText = words.slice(0, currentWordIndex).join(' ')
-        const partialDstText = targetText.split(' ').slice(0, Math.ceil(currentWordIndex * (targetText.split(' ').length / words.length))).join(' ')
-        
-        setActiveSubtitle({
-          userName: phrase.speaker,
-          srcLang: phrase.srcLang,
-          srcText: partialSrcText,
-          dstLang: translateTargetLang,
-          dstText: partialDstText,
-        })
-        
-        currentWordIndex++
-      }, 300)
-    }
-
-    const iv = setInterval(runSimulationStep, 14000)
-    const delayTimeout = setTimeout(runSimulationStep, 3000)
-
-    return () => {
-      clearInterval(iv)
-      clearTimeout(delayTimeout)
-      if (typingInterval) clearInterval(typingInterval)
-    }
-  }, [isTranslateActive, translateTargetLang])
 
   const handleMuteParticipant = async (targetIdentity: string) => {
     if (!localParticipant || !isHost) return
