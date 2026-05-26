@@ -94,6 +94,7 @@ export default function RoomPage() {
 
   // Pre-join state — chosen by the user before connecting to LiveKit.
   const [preJoinDone, setPreJoinDone] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   const [selectedCamId, setSelectedCamId] = useState<string | undefined>(undefined)
   const [selectedMicId, setSelectedMicId] = useState<string | undefined>(undefined)
   const [initialCamEnabled, setInitialCamEnabled] = useState(true)
@@ -558,6 +559,15 @@ export default function RoomPage() {
     )
   }
 
+  if (isTransitioning) {
+    return (
+      <div className={styles.loadingRoom}>
+        <div className={styles.loadingSpinner} />
+        <p className={styles.loadingText}>Подготовка медиа-устройств…</p>
+      </div>
+    )
+  }
+
   if (!preJoinDone) {
     return (
       <PreJoinScreen
@@ -571,7 +581,12 @@ export default function RoomPage() {
         onMicChange={setSelectedMicId}
         onToggleMic={() => setInitialMicEnabled((v) => !v)}
         onToggleCam={() => setInitialCamEnabled((v) => !v)}
-        onJoin={() => setPreJoinDone(true)}
+        onJoin={async () => {
+          setIsTransitioning(true)
+          await new Promise((resolve) => setTimeout(resolve, 300))
+          setPreJoinDone(true)
+          setIsTransitioning(false)
+        }}
       />
     )
   }
@@ -612,6 +627,7 @@ export default function RoomPage() {
         user={user}
         meetingId={id}
         router={router}
+        selectedMicId={selectedMicId}
         onLeave={() => {
           isLeavingRef.current = true
         }}
@@ -974,6 +990,7 @@ interface RoomInnerProps {
   meetingId: string
   router: ReturnType<typeof useRouter>
   onLeave: () => void
+  selectedMicId?: string
 }
 
 interface ChatMessage {
@@ -984,7 +1001,7 @@ interface ChatMessage {
   timestamp: number
 }
 
-function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps) {
+function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }: RoomInnerProps) {
   const room = useRoomContext()
   const remoteParticipants = useParticipants().filter((p) => !p.isLocal)
   const { localParticipant } = useLocalParticipant()
@@ -1356,11 +1373,11 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
       if (noiseSuppression) {
         setNoiseSuppression(false)
         if (nsCtxRef.current) {
-          await nsCtxRef.current.close()
+          await nsCtxRef.current.close().catch(() => {})
           nsCtxRef.current = null
         }
         if (nsPublishedTrackRef.current) {
-          await localParticipant.unpublishTrack(nsPublishedTrackRef.current.track)
+          await localParticipant.unpublishTrack(nsPublishedTrackRef.current.track).catch(() => {})
           nsPublishedTrackRef.current = null
         }
         // Restore default mic
@@ -1374,10 +1391,21 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
         }
         setNoiseSuppression(true)
         
-        // 1. Get raw media stream from microphone
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+        // 1. Unpublish current microphone FIRST to release hardware lock and avoid conflict
+        const micPublication = localParticipant.getTrackPublication(Track.Source.Microphone)
+        if (micPublication && micPublication.track) {
+          nsOriginalTrackRef.current = micPublication.track
+          await localParticipant.unpublishTrack(micPublication.track)
+          // Wait 150ms for the browser to fully release the microphone device
+          await new Promise((resolve) => setTimeout(resolve, 150))
+        }
         
-        // 2. Web Audio setup
+        // 2. Get raw media stream from microphone (now device is guaranteed free)
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : { echoCancellation: true, noiseSuppression: true }
+        })
+        
+        // 3. Web Audio setup
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
         const ctx = new AudioContextClass()
         nsCtxRef.current = ctx
@@ -1411,14 +1439,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
         
         const cleanTrack = dest.stream.getAudioTracks()[0]
         
-        // Unpublish current microphone
-        const micPublication = localParticipant.getTrackPublication(Track.Source.Microphone)
-        if (micPublication && micPublication.track) {
-          nsOriginalTrackRef.current = micPublication.track
-          await localParticipant.unpublishTrack(micPublication.track)
-        }
-        
-        // Publish clean track
+        // 4. Publish clean track
         const pub = await localParticipant.publishTrack(cleanTrack, {
           name: 'microphone-clean',
           source: Track.Source.Microphone
@@ -1429,6 +1450,13 @@ function RoomInner({ meeting, user, meetingId, router, onLeave }: RoomInnerProps
     } catch (err) {
       console.error('Failed to toggle noise suppression:', err)
       setNoiseSuppression(false)
+      // Attempt recovery of original microphone on fail
+      try {
+        await localParticipant.setMicrophoneEnabled(true)
+        setMicEnabled(true)
+      } catch (recErr) {
+        console.error('Failed to recover microphone after noise suppression error:', recErr)
+      }
     }
   }
 

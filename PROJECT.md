@@ -46,6 +46,7 @@
 | 12 | Переработка и детализация мобильного UX/UI (дашборд, комната звонка, архив) | [x] | [dashboard.module.css](file:///f:/c.echo/apps/web/src/app/dashboard/dashboard.module.css), [page.tsx](file:///f:/c.echo/apps/web/src/app/dashboard/page.tsx), [room.module.css](file:///f:/c.echo/apps/web/src/app/room/[id]/room.module.css), [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx), [protocol.module.css](file:///f:/c.echo/apps/web/src/app/archive/[id]/protocol.module.css) | Реализована адаптивная нижняя навигация, выплывающие bottom-drawers для чата/участников/Senti, меню 'Ещё' для компактного управления и горизонтальный свайп вкладок архива. |
 | 13 | Устранение сбоев WebRTC подключения (ICE) и сетевых 401 ошибок в консоли | [x] | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx), [api.ts](file:///f:/c.echo/apps/web/src/lib/api.ts) | Удалена жесткая перезапись `iceServers` в `<LiveKitRoom />`, позволяя клиенту использовать TCP-кандидаты сервера на Railway. Добавлен локальный пропуск неавторизованных запросов без токенов, устраняя ложные 401 ошибки. |
 | 14 | Учет только активных участников комнат и автоматическая очистка гостей | [x] | [limits.ts](file:///f:/c.echo/apps/api/src/services/limits.ts), [meetings.ts](file:///f:/c.echo/apps/api/src/routes/meetings.ts), [auth.ts](file:///f:/c.echo/apps/api/src/routes/auth.ts) | Реализован подсчет и вывод участников на дашборде только на основе текущих подключений в LiveKit. Настроен автоматический сборщик мусора, удаляющий временных гостей из базы данных после выхода или завершения встречи. |
+| 15 | Проектирование и аудит стабильности медиа-подключений и безопасности ключей | [x] | `PROJECT.md`, [livekit.yaml](file:///f:/c.echo/livekit.yaml), [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx) | Проведен комплексный глубокий аудит (gstack/CSO/Architect) причин сбоев WebRTC и блокировки микрофонов, проанализированы все конфигурации на отсутствие захардкоженных секретов. Разработано и задокументировано готовое продуктовое решение. |
 
 ---
 
@@ -54,6 +55,9 @@
 | Проблема / Узкое место | Критичность | Локация | Влияние на продукт |
 | :--- | :--- | :--- | :--- |
 | **Локальная природа записи** | Средн. | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/%5Bid%5D/page.tsx) | Хотя микширование теперь стабильно при переподключениях, запись по-прежнему зависит от работы браузера хоста. В будущем рекомендуется серверный LiveKit Egress. |
+| **Отсутствие TURN сервера & Strict ICE-TCP** | Высок. | [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Пользователи за корпоративными брандмауэрами или симметричными NAT не могут установить WebRTC соединение (выкидывает/ошибка подключения). Требуется интеграция TURN-over-TLS на порту 443. |
+| **Блокировка микрофона в Safari / iOS** | Высок. | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/%5Bid%5D/page.tsx) | Гонка при переключении от Pre-Join захвата к LiveKitRoom: Safari не успевает освободить аудио-устройство, вызывая NotReadableError. Также повторный getUserMedia в Noise Suppression глушит основной поток. |
+| **Лимитированные CORS-источники LiveKit** | Средн. | [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Hardcoded `allowed_origins` блокирует WebRTC-соединения с новых доменов или staging-сред. Требуется динамическая конфигурация. |
 
 ---
 
