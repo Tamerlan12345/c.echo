@@ -869,8 +869,10 @@ function PreJoinScreen({
     }
   }, [selectedCamId, selectedMicId, camEnabled, micEnabled, stopStream, onToggleCam, onToggleMic])
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     stopStream()
+    // Explicitly wait 250ms to allow iOS Safari to release the audio/video interface hardware
+    await new Promise((resolve) => setTimeout(resolve, 250))
     onJoin()
   }
 

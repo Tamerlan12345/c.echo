@@ -31,7 +31,7 @@ rtc:
 
 # CORS — allow frontend origin to validate tokens via HTTP before WebSocket upgrade
 allowed_origins:
-  - "https://centras-echo.up.railway.app"
+  - "*"
 
 # Keys: format is API_KEY: API_SECRET
 keys:
@@ -52,6 +52,14 @@ room:
   max_participants: 7
   empty_timeout: 300  # 5 minutes
 
-# TURN is added in Phase B (TURN/TLS with custom domain).
+# TURN: external cloud TURN service configuration for Railway compatibility.
+# Uses env vars: EXTERNAL_TURN_USERNAME and EXTERNAL_TURN_CREDENTIAL
 turn:
-  enabled: false
+  enabled: true
+  external_servers:
+    - urls:
+        - "turn:relay.metered.ca:80"
+        - "turn:relay.metered.ca:443"
+        - "turns:relay.metered.ca:443?transport=tcp"
+      username: ${EXTERNAL_TURN_USERNAME}
+      credential: ${EXTERNAL_TURN_CREDENTIAL}
