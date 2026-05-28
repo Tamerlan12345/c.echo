@@ -29,6 +29,23 @@ rtc:
   # egress IP, which is different from the proxy edge IP clients connect to.
   use_external_ip: false
 
+  turn_servers:
+    - host: "global.relay.metered.ca"
+      port: 80
+      protocol: "udp"
+      username: ${EXTERNAL_TURN_USERNAME}
+      credential: ${EXTERNAL_TURN_CREDENTIAL}
+    - host: "global.relay.metered.ca"
+      port: 443
+      protocol: "udp"
+      username: ${EXTERNAL_TURN_USERNAME}
+      credential: ${EXTERNAL_TURN_CREDENTIAL}
+    - host: "global.relay.metered.ca"
+      port: 443
+      protocol: "tls"
+      username: ${EXTERNAL_TURN_USERNAME}
+      credential: ${EXTERNAL_TURN_CREDENTIAL}
+
 # CORS — allow frontend origin to validate tokens via HTTP before WebSocket upgrade
 allowed_origins:
   - "*"
@@ -52,14 +69,3 @@ room:
   max_participants: 7
   empty_timeout: 300  # 5 minutes
 
-# TURN: external cloud TURN service configuration for Railway compatibility.
-# Uses env vars: EXTERNAL_TURN_USERNAME and EXTERNAL_TURN_CREDENTIAL
-turn:
-  enabled: true
-  external_servers:
-    - urls:
-        - "turn:relay.metered.ca:80"
-        - "turn:relay.metered.ca:443"
-        - "turns:relay.metered.ca:443?transport=tcp"
-      username: ${EXTERNAL_TURN_USERNAME}
-      credential: ${EXTERNAL_TURN_CREDENTIAL}

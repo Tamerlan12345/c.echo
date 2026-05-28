@@ -1,0 +1,7 @@
+FROM livekit/livekit-server:latest
+
+# Копируем локальный файл livekit.yaml внутрь контейнера
+COPY livekit.yaml /etc/livekit.yaml
+
+# Запускаем сервер LiveKit с указанием скопированного файла конфигурации
+ENTRYPOINT ["/livekit-server", "--config", "/etc/livekit.yaml"]
