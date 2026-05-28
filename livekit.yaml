@@ -48,16 +48,18 @@ rtc:
 
 # CORS — allow frontend origin to validate tokens via HTTP before WebSocket upgrade
 allowed_origins:
-  - "*"
+  - ${LIVEKIT_ALLOWED_ORIGINS}
+  - "http://localhost:3000"
 
 # Keys: format is API_KEY: API_SECRET
 keys:
-  centras_api_key: ${LIVEKIT_API_SECRET}
+  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
 
 # Egress — write audio files to Railway Volume
 egress:
   redis:
-    address: localhost:6379
+    address: ${REDIS_ADDRESS}
+    password: ${REDIS_PASSWORD}
 
 # Logging
 logging:
@@ -68,4 +70,5 @@ logging:
 room:
   max_participants: 7
   empty_timeout: 300  # 5 minutes
+
 
