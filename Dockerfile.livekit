@@ -1,7 +1,16 @@
 FROM livekit/livekit-server:latest
 
-# Копируем локальный файл livekit.yaml внутрь контейнера
-COPY livekit.yaml /etc/livekit.yaml
+USER root
 
-# Запускаем сервер LiveKit с указанием скопированного файла конфигурации
-ENTRYPOINT ["/livekit-server", "--config", "/etc/livekit.yaml"]
+# Install gettext package which contains envsubst
+RUN apk add --no-cache gettext
+
+# Copy configuration template and entrypoint script
+COPY livekit.yaml /etc/livekit.yaml.template
+COPY entrypoint.sh /entrypoint.sh
+
+# Ensure entrypoint is executable
+RUN chmod +x /entrypoint.sh
+
+# Set the custom entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

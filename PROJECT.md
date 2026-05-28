@@ -28,6 +28,14 @@
 
 ---
 
+## Решения (Decisions Log)
+
+| # | Дата | Решение | Контекст | Отвергнутые альтернативы | Стоимость отмены |
+|---|------|---------|----------|--------------------------|------------------|
+| 1 | 2026-05-28 | Использование `gettext` (`envsubst`) на старте контейнера LiveKit | LiveKit Server не раскрывает синтаксис `${VAR}` в YAML напрямую. Переменные окружения должны подставляться в шаблон при старте контейнера. | 1. Хардкод значений в репозитории (утечка секретов). 2. Скрипт на Python/Node (раздувает образ). | Низкая (удаление gettext и откат Dockerfile/entrypoint). |
+
+---
+
 ## Журнал задач
 
 | # | Задача / Продуктовая фича | Статус | Файлы | Оценка продукта и примечания |
@@ -54,7 +62,7 @@
 | 20 | Аудит юзабилити и совместной работы | [x] | [usability_and_collaboration_audit.md](file:///C:/Users/TJumagulov/.gemini/antigravity/brain/0a123a01-067e-46a7-9325-78cff6dfb8d4/usability_and_collaboration_audit.md) | Проведен комплексный аудит удобства интерфейса комнаты звонка, механизмов разграничения ролей участников и стабильности транскрибирования. |
 | 21 | Премиальный визуальный редизайн комнаты звонка (Big Tech UX/UI) | [x] | [globals.css](file:///f:/c.echo/apps/web/src/app/globals.css), [room.module.css](file:///f:/c.echo/apps/web/src/app/room/[id]/room.module.css) | Внедрена кинематографическая темная тема с использованием размытий (backdrop-blur), плавающих стеклянных кнопок с kinetic-анимациями и глубоким неоновым свечением. Реконструированы боковые панели Senti Panel, Chat Panel, Senti Translate Panel, зал ожидания и модальные окна настроек. |
 | 22 | Исправление согласий Senti и отката записи при сбоях бэкенда | [x] | [consents.ts](file:///f:/c.echo/apps/api/src/routes/consents.ts), [livekit.ts](file:///f:/c.echo/apps/api/src/routes/livekit.ts), [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx) | Внедрена проверка согласий только среди активных (онлайн) участников LiveKit-комнаты с помощью RoomServiceClient. Исправлен сбой DeviceSettingsModal (замена getSelectedSpeakerDeviceId). Реализован транзакционный запуск записи с гарантированным откатом при ошибках. |
-| 23 | Настройка сборки self-hosted LiveKit из репозитория | [x] | [livekit.yaml](file:///f:/c.echo/livekit.yaml), [Dockerfile.livekit](file:///f:/c.echo/Dockerfile.livekit) | Создан Dockerfile.livekit и скорректирован livekit.yaml для деплоя сервера LiveKit напрямую из GitHub-репозитория с нативной поддержкой переменных TURN, CORS, Keys и Redis. |
+| 23 | Настройка сборки self-hosted LiveKit из репозитория | [x] | [livekit.yaml](file:///f:/c.echo/livekit.yaml), [Dockerfile.livekit](file:///f:/c.echo/Dockerfile.livekit), [entrypoint.sh](file:///f:/c.echo/entrypoint.sh) | Создан Dockerfile.livekit, entrypoint.sh и скорректирован livekit.yaml для деплоя сервера LiveKit напрямую из GitHub-репозитория. Настроена подстановка переменных TURN, CORS, Keys и Redis при запуске через `envsubst` для предотвращения ошибок разбора YAML. |
 
 
 
