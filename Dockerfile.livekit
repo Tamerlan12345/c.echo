@@ -9,8 +9,8 @@ RUN apk add --no-cache gettext
 COPY livekit.yaml /etc/livekit.yaml.template
 COPY entrypoint.sh /entrypoint.sh
 
-# Ensure entrypoint is executable
-RUN chmod +x /entrypoint.sh
+# Fix line endings (CRLF to LF) for Unix compatibility and ensure execution permissions
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Set the custom entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
