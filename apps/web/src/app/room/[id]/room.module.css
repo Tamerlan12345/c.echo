@@ -1782,3 +1782,164 @@
   vertical-align: middle;
 }
 
+/* ─── Participant Hand Raised Tile Overlay ────────────────────────────────────── */
+
+.tileHandRaisedOverlay {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.95);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), var(--shadow-glow-amber);
+  animation: pop-in 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes pop-in {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ─── Floating Consent Banner inside Video Area ───────────────────────────────── */
+
+.consentBannerFloating {
+  position: absolute;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(13, 20, 36, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: var(--shadow-glow-amber), 0 10px 30px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-lg);
+  max-width: 90%;
+  width: max-content;
+  animation: slide-down-banner 0.3s ease;
+}
+
+@keyframes slide-down-banner {
+  from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+.consentBannerIcon {
+  color: var(--color-accent-amber);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.consentBannerText {
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+  line-height: 1.45;
+}
+
+.consentBannerClose {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  flex-shrink: 0;
+  transition: color var(--transition-fast);
+}
+
+.consentBannerClose:hover {
+  color: var(--color-text-primary);
+}
+
+/* ─── Device Settings Modal ─────────────────────────────────────────────────── */
+
+.settingsModal {
+  max-width: 440px;
+  padding: var(--space-6);
+}
+
+.settingsModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+
+.settingsModalHeader h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.closeBtn:hover {
+  background: var(--color-bg-surface-2);
+  color: var(--color-text-primary);
+}
+
+.settingsModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  text-align: left;
+}
+
+.settingsFormGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settingsFormGroup label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.settingsFormGroup select {
+  width: 100%;
+  height: 40px;
+  padding: 8px 12px;
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  outline: none;
+  font-size: 0.875rem;
+  transition: border-color var(--transition-fast);
+}
+
+.settingsFormGroup select:focus {
+  border-color: var(--color-accent-blue);
+}
+
+.settingsModalFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+

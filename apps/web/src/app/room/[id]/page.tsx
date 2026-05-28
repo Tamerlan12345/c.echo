@@ -11,6 +11,7 @@ import {
   GridLayout,
   ParticipantTile,
   useTracks,
+  useParticipantContext,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { Track, RoomEvent, ConnectionQuality, ParticipantEvent } from 'livekit-client'
@@ -19,7 +20,7 @@ import {
   PhoneOff, Bot, Shield, CheckCircle2, XCircle,
   Circle, StopCircle, X, LogOut, MessageSquare, Send,
   Globe, Copy, Check, Calendar, Lock, Hand, Smile, VolumeX,
-  LayoutGrid, User as UserIcon, MoreHorizontal
+  LayoutGrid, User as UserIcon, MoreHorizontal, Settings
 } from 'lucide-react'
 import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
@@ -636,9 +637,23 @@ export default function RoomPage() {
   )
 }
 
+// ─── Participant Hand Overlay Component ──────────────────────────────────────────
+
+function ParticipantHandOverlay({ raisedHands }: { raisedHands: Record<string, boolean> }) {
+  const participant = useParticipantContext()
+  if (!participant) return null
+  const isHandRaised = raisedHands[participant.identity]
+  if (!isHandRaised) return null
+  return (
+    <div className={styles.tileHandRaisedOverlay} title="Поднята рука">
+      <span>✋</span>
+    </div>
+  )
+}
+
 // ─── Speaker view (one big tile + thumbnail strip) ────────────────────────────
 
-function SpeakerView({ tracks }: { tracks: ReturnType<typeof useTracks> }) {
+function SpeakerView({ tracks, raisedHands }: { tracks: ReturnType<typeof useTracks>; raisedHands: Record<string, boolean> }) {
   // Pick the focus track: prefer a ScreenShare, otherwise the active speaker, otherwise the first remote camera, otherwise any.
   const screenShare = tracks.find((t) => t.source === Track.Source.ScreenShare)
   const speakingCam = tracks.find(
@@ -656,13 +671,17 @@ function SpeakerView({ tracks }: { tracks: ReturnType<typeof useTracks> }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 8 }}>
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-        <ParticipantTile trackRef={focus} style={{ width: '100%', height: '100%' }} />
+        <ParticipantTile trackRef={focus} style={{ width: '100%', height: '100%' }}>
+          <ParticipantHandOverlay raisedHands={raisedHands} />
+        </ParticipantTile>
       </div>
       {others.length > 0 && (
         <div style={{ display: 'flex', gap: 8, height: 120, flexShrink: 0, overflowX: 'auto', paddingBottom: 4 }}>
           {others.map((t) => (
             <div key={`${t.participant.identity}-${t.source}`} style={{ width: 180, height: '100%', flexShrink: 0, borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-              <ParticipantTile trackRef={t} style={{ width: '100%', height: '100%' }} />
+              <ParticipantTile trackRef={t} style={{ width: '100%', height: '100%' }}>
+                <ParticipantHandOverlay raisedHands={raisedHands} />
+              </ParticipantTile>
             </div>
           ))}
         </div>
@@ -982,6 +1001,141 @@ function PreJoinScreen({
   )
 }
 
+// ─── Device Settings Modal Component ──────────────────────────────────────────
+
+function DeviceSettingsModal({ room, onClose }: { room: any; onClose: () => void }) {
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [activeMic, setActiveMic] = useState<string>('')
+  const [activeCam, setActiveCam] = useState<string>('')
+  const [activeSpeaker, setActiveSpeaker] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+
+  const updateDevices = useCallback(async () => {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices()
+      setDevices(list)
+
+      const localMicTrack = room.localParticipant?.getTrackPublication(Track.Source.Microphone)?.track
+      const localCamTrack = room.localParticipant?.getTrackPublication(Track.Source.Camera)?.track
+
+      const currentMicId = localMicTrack?.mediaStreamTrack?.getSettings()?.deviceId || ''
+      const currentCamId = localCamTrack?.mediaStreamTrack?.getSettings()?.deviceId || ''
+      const currentSpeakerId = room.getSelectedSpeakerDeviceId() || 'default'
+
+      setActiveMic(currentMicId)
+      setActiveCam(currentCamId)
+      setActiveSpeaker(currentSpeakerId)
+    } catch (e) {
+      console.error('Failed to get devices:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [room])
+
+  useEffect(() => {
+    updateDevices()
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+      navigator.mediaDevices.addEventListener('devicechange', updateDevices)
+    }
+    return () => {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+        navigator.mediaDevices.removeEventListener('devicechange', updateDevices)
+      }
+    }
+  }, [updateDevices])
+
+  const handleMicChange = async (id: string) => {
+    setActiveMic(id)
+    try {
+      await room.switchActiveDevice('audioinput', id)
+    } catch (err) {
+      console.error('Failed to switch microphone:', err)
+    }
+  }
+
+  const handleCamChange = async (id: string) => {
+    setActiveCam(id)
+    try {
+      await room.switchActiveDevice('videoinput', id)
+    } catch (err) {
+      console.error('Failed to switch camera:', err)
+    }
+  }
+
+  const handleSpeakerChange = async (id: string) => {
+    setActiveSpeaker(id)
+    try {
+      await room.switchActiveDevice('audiooutput', id)
+    } catch (err) {
+      console.error('Failed to switch speaker:', err)
+    }
+  }
+
+  const mics = devices.filter((d) => d.kind === 'audioinput')
+  const cams = devices.filter((d) => d.kind === 'videoinput')
+  const speakers = devices.filter((d) => d.kind === 'audiooutput')
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className={`modal-content ${styles.settingsModal}`} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.settingsModalHeader}>
+          <h3>Настройки устройств</h3>
+          <button className={styles.closeBtn} onClick={onClose} aria-label="Закрыть настройки">
+            <X size={18} />
+          </button>
+        </div>
+        
+        {loading ? (
+          <div className={styles.loadingSpinner} />
+        ) : (
+          <div className={styles.settingsModalBody}>
+            <div className={styles.settingsFormGroup}>
+              <label htmlFor="select-mic">Микрофон</label>
+              <select id="select-mic" value={activeMic} onChange={(e) => handleMicChange(e.target.value)}>
+                {mics.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Микрофон (${d.deviceId.slice(0, 5)})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.settingsFormGroup}>
+              <label htmlFor="select-cam">Камера</label>
+              <select id="select-cam" value={activeCam} onChange={(e) => handleCamChange(e.target.value)}>
+                {cams.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label || `Камера (${d.deviceId.slice(0, 5)})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {speakers.length > 0 && (
+              <div className={styles.settingsFormGroup}>
+                <label htmlFor="select-speaker">Динамик</label>
+                <select id="select-speaker" value={activeSpeaker} onChange={(e) => handleSpeakerChange(e.target.value)}>
+                  {speakers.map((d) => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label || `Динамик (${d.deviceId.slice(0, 5)})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className={styles.settingsModalFooter}>
+          <button className="btn btn-primary" onClick={onClose}>
+            Готово
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Inner room (has access to LiveKit context) ────────────────────────────────
 
 interface RoomInnerProps {
@@ -1028,6 +1182,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
   const [showChat, setShowChat] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [roomCopied, setRoomCopied] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   // Senti Translate (BETA) states
   const [showTranslate, setShowTranslate] = useState(false)
@@ -1139,11 +1294,22 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const chatBottomRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll on new messages
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    const container = chatContainerRef.current
+    if (!container) return
+
+    const lastMsg = messages[messages.length - 1]
+    const isMyMessage = lastMsg?.userId === localParticipant?.identity
+    const threshold = 100
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= threshold
+
+    if (isNearBottom || isMyMessage || messages.length <= 1) {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, localParticipant])
 
   // Clear unread when opening chat
   useEffect(() => {
@@ -2167,10 +2333,30 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
         <div className={styles.videoGrid}>
           {viewMode === 'gallery' ? (
             <GridLayout tracks={tracks} style={{ height: '100%' }}>
-              <ParticipantTile />
+              <ParticipantTile>
+                <ParticipantHandOverlay raisedHands={raisedHands} />
+              </ParticipantTile>
             </GridLayout>
           ) : (
-            <SpeakerView tracks={tracks} />
+            <SpeakerView tracks={tracks} raisedHands={raisedHands} />
+          )}
+
+          {/* Floating Consent Banner inside video area */}
+          {showConsentModal && (
+            <div className={styles.consentBannerFloating}>
+              <div className={styles.consentBannerIcon}>
+                <Shield size={18} />
+              </div>
+              <div className={styles.consentBannerText}>
+                <strong>Запрос согласия на запись:</strong> Для запуска Senti-протокола требуется согласие всех участников на запись и обработку аудиоданных.
+              </div>
+              <button className="btn btn-sm btn-primary" onClick={handleGiveConsent}>
+                Дать согласие
+              </button>
+              <button className={styles.consentBannerClose} onClick={() => setShowConsentModal(false)} aria-label="Закрыть">
+                <X size={14} />
+              </button>
+            </div>
           )}
 
           {/* Floating reactions layer */}
@@ -2461,6 +2647,29 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
                 </Tooltip>
               </div>
             )}
+
+            <Tooltip label="Настройки устройств">
+              <button
+                id="toggle-settings-btn"
+                className={`${styles.controlBtn} ${showSettingsModal ? styles.active : ''}`}
+                onClick={() => {
+                  setShowSettingsModal((v) => {
+                    const next = !v
+                    if (next) {
+                      setShowChat(false)
+                      setShowSenti(false)
+                      setShowTranslate(false)
+                      setShowMoreMenu(false)
+                      setShowParticipants(false)
+                    }
+                    return next
+                  })
+                }}
+                aria-label="Настройки устройств"
+              >
+                <Settings size={20} />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -2483,7 +2692,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
             </button>
           </div>
 
-          <div className={styles.chatMessages}>
+          <div ref={chatContainerRef} className={styles.chatMessages}>
             {messages.length === 0 ? (
               <div className={styles.chatEmpty}>
                 <div className={styles.chatEmptyIcon}>
@@ -2803,46 +3012,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
         </aside>
       )}
 
-      {/* ── Consent Modal ── */}
-      {showConsentModal && (
-        <div className="modal-overlay" onClick={() => setShowConsentModal(false)}>
-          <div
-            className={`modal-content ${styles.consentModal}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.consentModalHeader}>
-              <div className={styles.consentModalIcon}>
-                <Shield size={24} />
-              </div>
-              <div>
-                <h3 className={styles.consentModalTitle}>Согласие на запись</h3>
-                <p className={styles.consentModalDesc}>
-                  Для запуска Senti-протокола необходимо согласие всех участников встречи на запись и обработку аудио.
-                </p>
-              </div>
-            </div>
 
-            <label className={styles.consentCheckLabel}>
-              <input
-                type="checkbox"
-                id="consent-checkbox"
-                onChange={() => {}}
-                onClick={handleGiveConsent}
-              />
-              <span className={styles.consentCheckText}>
-                Я даю согласие на запись данной встречи и обработку аудиоданных системой Senti.
-                Я понимаю, что запись будет автоматически удалена после создания протокола.
-              </span>
-            </label>
-
-            <div className={styles.consentActions}>
-              <button className="btn btn-ghost" onClick={() => setShowConsentModal(false)}>
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── End Call Confirm ── */}
       {showEndConfirm && (
@@ -2921,6 +3091,14 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Device Settings Modal ── */}
+      {showSettingsModal && (
+        <DeviceSettingsModal
+          room={room}
+          onClose={() => setShowSettingsModal(false)}
+        />
       )}
 
       {/* ── Mobile Backdrop ── */}
@@ -3057,6 +3235,20 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
               <span className={styles.moreMenuBtnLabel}>
                 {viewMode === 'gallery' ? 'Докладчик' : 'Сетка'}
               </span>
+            </button>
+
+            {/* Device Settings */}
+            <button
+              className={`${styles.moreMenuBtn} ${showSettingsModal ? styles.moreMenuBtnActive : ''}`}
+              onClick={() => {
+                setShowSettingsModal(true)
+                setShowMoreMenu(false)
+              }}
+            >
+              <div className={styles.moreMenuIconWrapper}>
+                <Settings size={20} />
+              </div>
+              <span className={styles.moreMenuBtnLabel}>Устройства</span>
             </button>
           </div>
         </aside>
