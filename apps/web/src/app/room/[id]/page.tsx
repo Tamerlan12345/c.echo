@@ -1022,7 +1022,7 @@ function DeviceSettingsModal({ room, onClose }: { room: any; onClose: () => void
 
       const currentMicId = localMicTrack?.mediaStreamTrack?.getSettings()?.deviceId || ''
       const currentCamId = localCamTrack?.mediaStreamTrack?.getSettings()?.deviceId || ''
-      const currentSpeakerId = room.getSelectedSpeakerDeviceId() || 'default'
+      const currentSpeakerId = room.getActiveDevice('audiooutput') || 'default'
 
       setActiveMic(currentMicId)
       setActiveCam(currentCamId)
@@ -1989,8 +1989,17 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
   // Start recording (host only)
   const handleStartRecording = async () => {
     if (!localParticipant) return
+    let backendStarted = false
     try {
-      // 1. Initialize Web Audio API Mixer
+      // 1. Notify backend and update state in DB first to perform consent validation
+      const res = await livekitApi.startRecording(meetingId)
+      if ('error' in res) {
+        alert(`Не удалось запустить запись в базе: ${res.error?.message}`)
+        return
+      }
+      backendStarted = true
+
+      // 2. Initialize Web Audio API Mixer
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
       const audioCtx = new AudioContextClass()
       const dest = audioCtx.createMediaStreamDestination()
@@ -2057,7 +2066,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       ;(window as any)._onTrackSubscribed = onTrackSubscribed
       ;(window as any)._onTrackUnsubscribed = onTrackUnsubscribed
 
-      // 2. Initialize MediaRecorder
+      // 3. Initialize MediaRecorder
       const options = { mimeType: 'audio/webm;codecs=opus' }
       let recorder: MediaRecorder
       try {
@@ -2075,7 +2084,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
         room.off(RoomEvent.TrackSubscribed, (window as any)._onTrackSubscribed)
         room.off(RoomEvent.TrackUnsubscribed, (window as any)._onTrackUnsubscribed)
         if (audioContextRef.current) {
-          await audioContextRef.current.close()
+          await audioContextRef.current.close().catch(() => {})
         }
 
         const blob = new Blob(chunks, { type: recorder.mimeType })
@@ -2097,19 +2106,31 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       recorder.start()
       setIsRecording(true)
 
-      // Notify backend and update state in DB
-      const res = await livekitApi.startRecording(meetingId)
-      if ('error' in res) {
-        alert(`Не удалось запустить запись в базе: ${res.error?.message}`)
-      }
-
       // Broadcast signal to other participants via DataChannel
       const encoder = new TextEncoder()
       const data = encoder.encode(JSON.stringify({ type: 'recording_started' }))
       await localParticipant.publishData(data, { reliable: true })
 
     } catch (err: any) {
-      alert(`Ошибка доступа к аудиоустройствам записи: ${err.message}`)
+      alert(`Ошибка запуска аудиозаписи: ${err.message}`)
+      // Revert backend state if updated
+      if (backendStarted) {
+        await livekitApi.stopRecording(meetingId).catch(() => {})
+      }
+      // Revert local state
+      setIsRecording(false)
+      if (mediaRecorderRef.current) {
+        try {
+          mediaRecorderRef.current.stop()
+        } catch (e) {}
+        mediaRecorderRef.current = null
+      }
+      if (audioContextRef.current) {
+        await audioContextRef.current.close().catch(() => {})
+        audioContextRef.current = null
+      }
+      room.off(RoomEvent.TrackSubscribed, (window as any)._onTrackSubscribed)
+      room.off(RoomEvent.TrackUnsubscribed, (window as any)._onTrackUnsubscribed)
     }
   }
 

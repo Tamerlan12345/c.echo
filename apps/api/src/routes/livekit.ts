@@ -166,17 +166,32 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: { code: 'ALREADY_RECORDING', message: 'Recording already started' } })
     }
 
-    // Verify all participants consented
-    const consentCheck = await pool.query(
-      `SELECT
-         COUNT(DISTINCT mp.user_id) AS total,
-         COUNT(DISTINCT mc.user_id) AS consented
-       FROM meeting_participants mp
-       LEFT JOIN meeting_consents mc
-         ON mc.meeting_id = mp.meeting_id AND mc.user_id = mp.user_id
-       WHERE mp.meeting_id = $1`,
-      [meetingId],
-    )
+    // Verify all active participants consented
+    let activeUserIds: string[] | null = null
+    try {
+      const client = getLiveKitClient()
+      const participants = await client.listParticipants(meeting.rows[0].livekit_room)
+      activeUserIds = participants.map((p) => p.identity)
+    } catch (err) {
+      request.log.warn(err, 'Failed to fetch active participants from LiveKit in egress start')
+    }
+
+    let query = `
+      SELECT
+        COUNT(DISTINCT mp.user_id) AS total,
+        COUNT(DISTINCT mc.user_id) AS consented
+      FROM meeting_participants mp
+      LEFT JOIN meeting_consents mc
+        ON mc.meeting_id = mp.meeting_id AND mc.user_id = mp.user_id
+      WHERE mp.meeting_id = $1
+    `
+    const params: any[] = [meetingId]
+    if (activeUserIds && activeUserIds.length > 0) {
+      query += ` AND mp.user_id = ANY($2::uuid[])`
+      params.push(activeUserIds)
+    }
+
+    const consentCheck = await pool.query(query, params)
     const { total, consented } = consentCheck.rows[0]
     if (Number(total) !== Number(consented)) {
       return reply.status(403).send({

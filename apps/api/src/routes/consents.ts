@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify'
+import { RoomServiceClient } from 'livekit-server-sdk'
 import { pool } from '../db/pool.js'
 
 export const consentsRoutes: FastifyPluginAsync = async (app) => {
@@ -66,18 +67,53 @@ export const consentsRoutes: FastifyPluginAsync = async (app) => {
   })
 }
 
+const getLiveKitUrl = (): string => {
+  const url = process.env.LIVEKIT_URL || ''
+  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
+    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
+  }
+  return url
+}
+
 async function getConsentStatus(meetingId: string) {
-  const result = await pool.query(
-    `SELECT
-       u.id, u.name, u.avatar_url,
-       mc.consented_at IS NOT NULL AS has_consented
-     FROM meeting_participants mp
-     JOIN users u ON u.id = mp.user_id
-     LEFT JOIN meeting_consents mc
-       ON mc.meeting_id = mp.meeting_id AND mc.user_id = mp.user_id
-     WHERE mp.meeting_id = $1`,
-    [meetingId],
-  )
+  let activeUserIds: string[] | null = null
+  try {
+    const meetingRes = await pool.query(
+      'SELECT livekit_room FROM meetings WHERE id = $1',
+      [meetingId]
+    )
+    const meeting = meetingRes.rows[0]
+    if (meeting) {
+      const client = new RoomServiceClient(
+        getLiveKitUrl(),
+        process.env.LIVEKIT_API_KEY!,
+        process.env.LIVEKIT_API_SECRET!,
+      )
+      const participants = await client.listParticipants(meeting.livekit_room)
+      activeUserIds = participants.map((p) => p.identity)
+    }
+  } catch (err) {
+    console.warn('Failed to fetch active participants from LiveKit in getConsentStatus:', err)
+  }
+
+  let query = `
+    SELECT
+      u.id, u.name, u.avatar_url,
+      mc.consented_at IS NOT NULL AS has_consented
+    FROM meeting_participants mp
+    JOIN users u ON u.id = mp.user_id
+    LEFT JOIN meeting_consents mc
+      ON mc.meeting_id = mp.meeting_id AND mc.user_id = mp.user_id
+    WHERE mp.meeting_id = $1
+  `
+  const params: any[] = [meetingId]
+
+  if (activeUserIds && activeUserIds.length > 0) {
+    query += ` AND mp.user_id = ANY($2::uuid[])`
+    params.push(activeUserIds)
+  }
+
+  const result = await pool.query(query, params)
 
   const participants = result.rows
   const total = participants.length
