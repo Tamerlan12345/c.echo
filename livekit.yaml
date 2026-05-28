@@ -46,20 +46,14 @@ rtc:
       username: ${EXTERNAL_TURN_USERNAME}
       credential: ${EXTERNAL_TURN_CREDENTIAL}
 
-# CORS — allow frontend origin to validate tokens via HTTP before WebSocket upgrade
-allowed_origins:
-  - ${LIVEKIT_ALLOWED_ORIGINS}
-  - "http://localhost:3000"
-
 # Keys: format is API_KEY: API_SECRET
 keys:
   ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
 
-# Egress — write audio files to Railway Volume
-egress:
-  redis:
-    address: ${REDIS_ADDRESS}
-    password: ${REDIS_PASSWORD}
+# Redis — required for coordinate state and scheduling Egress jobs
+redis:
+  address: ${REDIS_ADDRESS}
+  password: ${REDIS_PASSWORD}
 
 # Logging
 logging:
