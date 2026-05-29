@@ -216,7 +216,11 @@ export default function RoomPage() {
     }
   }, [id, publicInfo])
 
+  const hasInitialized = useRef(false)
+
   useEffect(() => {
+    if (hasInitialized.current) return
+    hasInitialized.current = true
     init()
   }, [id])
 
@@ -235,9 +239,17 @@ export default function RoomPage() {
       if ('data' in res && res.data) {
         const { status } = res.data
         if (status === 'admitted') {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
+          }
           setIsInWaitingRoom(false)
           init()
         } else if (status === 'rejected') {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
+          }
           setIsInWaitingRoom(false)
           setError('Организатор отклонил ваш запрос на вход в эту конференцию')
         }

@@ -66,7 +66,7 @@
 | 22 | Исправление согласий Senti и отката записи при сбоях бэкенда | [x] | [consents.ts](file:///f:/c.echo/apps/api/src/routes/consents.ts), [livekit.ts](file:///f:/c.echo/apps/api/src/routes/livekit.ts), [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx) | Внедрена проверка согласий только среди активных (онлайн) участников LiveKit-комнаты с помощью RoomServiceClient. Исправлен сбой DeviceSettingsModal (замена getSelectedSpeakerDeviceId). Реализован транзакционный запуск записи с гарантированным откатом при ошибках. |
 | 23 | Настройка сборки self-hosted LiveKit из репозитория | [x] | [livekit.yaml](file:///f:/c.echo/livekit.yaml), [Dockerfile.livekit](file:///f:/c.echo/Dockerfile.livekit), [entrypoint.sh](file:///f:/c.echo/entrypoint.sh) | Создан Dockerfile.livekit, entrypoint.sh и скорректирован livekit.yaml для деплоя сервера LiveKit напрямую из GitHub-репозитория. Настроена подстановка переменных TURN, Keys и Redis при запуске через `envsubst` для предотвращения ошибок разбора YAML. |
 | 24 | Синхронизация TCP-портов для стабильности WebRTC ICE-TCP | [x] | [PROJECT.md](file:///f:/c.echo/PROJECT.md), [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Документировано решение по сопоставлению портов TCP Proxy (23787 -> :23787) и переменной LIVEKIT_TCP_PORT для устранения сброса PeerConnection на клиентах за брандмауэром. |
-
+| 25 | Устранение обрыва соединения (reason 14) и сбоев PeerConnection | [x] | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx) | Исправлено состояние гонки (race condition) при двойном монтировании React 18 Strict Mode, приводившее к генерации дублирующих LiveKit токенов и каскадному сбросу сессий сервером. |
 
 
 
