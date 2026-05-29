@@ -3,7 +3,7 @@ FROM livekit/livekit-server:latest
 USER root
 
 # Install gettext package which contains envsubst
-RUN apk add --no-cache gettext
+RUN apk add --no-cache gettext socat
 
 # Copy configuration template and entrypoint script
 COPY livekit.yaml /etc/livekit.yaml.template
