@@ -33,6 +33,8 @@
 | # | Дата | Решение | Контекст | Отвергнутые альтернативы | Стоимость отмены |
 |---|------|---------|----------|--------------------------|------------------|
 | 1 | 2026-05-28 | Использование `gettext` (`envsubst`) на старте контейнера LiveKit | LiveKit Server не раскрывает синтаксис `${VAR}` в YAML напрямую. Переменные окружения должны подставляться в шаблон при старте контейнера. | 1. Хардкод значений в репозитории (утечка секретов). 2. Скрипт на Python/Node (раздувает образ). | Низкая (удаление gettext и откат Dockerfile/entrypoint). |
+| 2 | 2026-05-29 | Сопоставление портов WebRTC TCP Proxy на Railway | LiveKit Server не поддерживает раздельные порты прослушивания (listen) и анонсирования (advertise) в `rtc.tcp_port`. Для корректной генерации ICE-TCP кандидатов внешний порт TCP-прокси Railway должен совпадать с целевым внутренним портом контейнера. | Использование стандартного target-порта 25037 при внешнем порту 23787 (приводит к сбою соединения PeerConnection, так как клиенты пытаются подключиться к закрытому порту 25037). | Низкая (изменение настроек TCP Proxy в Railway). |
+
 
 ---
 
@@ -63,6 +65,8 @@
 | 21 | Премиальный визуальный редизайн комнаты звонка (Big Tech UX/UI) | [x] | [globals.css](file:///f:/c.echo/apps/web/src/app/globals.css), [room.module.css](file:///f:/c.echo/apps/web/src/app/room/[id]/room.module.css) | Внедрена кинематографическая темная тема с использованием размытий (backdrop-blur), плавающих стеклянных кнопок с kinetic-анимациями и глубоким неоновым свечением. Реконструированы боковые панели Senti Panel, Chat Panel, Senti Translate Panel, зал ожидания и модальные окна настроек. |
 | 22 | Исправление согласий Senti и отката записи при сбоях бэкенда | [x] | [consents.ts](file:///f:/c.echo/apps/api/src/routes/consents.ts), [livekit.ts](file:///f:/c.echo/apps/api/src/routes/livekit.ts), [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx) | Внедрена проверка согласий только среди активных (онлайн) участников LiveKit-комнаты с помощью RoomServiceClient. Исправлен сбой DeviceSettingsModal (замена getSelectedSpeakerDeviceId). Реализован транзакционный запуск записи с гарантированным откатом при ошибках. |
 | 23 | Настройка сборки self-hosted LiveKit из репозитория | [x] | [livekit.yaml](file:///f:/c.echo/livekit.yaml), [Dockerfile.livekit](file:///f:/c.echo/Dockerfile.livekit), [entrypoint.sh](file:///f:/c.echo/entrypoint.sh) | Создан Dockerfile.livekit, entrypoint.sh и скорректирован livekit.yaml для деплоя сервера LiveKit напрямую из GitHub-репозитория. Настроена подстановка переменных TURN, Keys и Redis при запуске через `envsubst` для предотвращения ошибок разбора YAML. |
+| 24 | Синхронизация TCP-портов для стабильности WebRTC ICE-TCP | [x] | [PROJECT.md](file:///f:/c.echo/PROJECT.md), [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Документировано решение по сопоставлению портов TCP Proxy (23787 -> :23787) и переменной LIVEKIT_TCP_PORT для устранения сброса PeerConnection на клиентах за брандмауэром. |
+
 
 
 
@@ -74,7 +78,7 @@
 | Проблема / Узкое место | Критичность | Локация | Влияние на продукт |
 | :--- | :--- | :--- | :--- |
 | **Локальная природа записи** | Средн. | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/%5Bid%5D/page.tsx) | Хотя микширование теперь стабильно при переподключениях, запись по-прежнему зависит от работы браузера хоста. В будущем рекомендуется серверный LiveKit Egress. |
-| **Отсутствие TURN сервера & Strict ICE-TCP** | Высок. | [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Пользователи за корпоративными брандмауэрами или симметричными NAT не могут установить WebRTC соединение (выкидывает/ошибка подключения). Требуется интеграция TURN-over-TLS на порту 443. |
+| **Отсутствие TURN сервера & Strict ICE-TCP** | Решено | [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Успешно интегрирован внешний TURN-сервер и настроена синхронизация портов TCP Proxy для прохождения WebRTC трафика через брандмауэры. |
 | **Блокировка микрофона в Safari / iOS** | Высок. | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/%5Bid%5D/page.tsx) | Гонка при переключении от Pre-Join захвата к LiveKitRoom: Safari не успевает освободить аудио-устройство, вызывая NotReadableError. Также повторный getUserMedia в Noise Suppression глушит основной поток. |
 | **Лимитированные CORS-источники LiveKit** | Средн. | [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Hardcoded `allowed_origins` блокирует WebRTC-соединения с новых доменов или staging-сред. Требуется динамическая конфигурация. |
 
