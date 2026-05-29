@@ -601,7 +601,7 @@ export default function RoomPage() {
       audio={hasMicrophone && initialMicEnabled ? (selectedMicId ? { deviceId: selectedMicId } : true) : false}
       connectOptions={{
         autoSubscribe: true,
-        peerConnectionTimeout: 15000,
+        peerConnectionTimeout: 45000,
       }}
       onDisconnected={() => {
         if (isLeavingRef.current) {
