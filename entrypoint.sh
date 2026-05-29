@@ -7,7 +7,7 @@ export RAILWAY_PROXY_TARGET_PORT="${RAILWAY_PROXY_TARGET_PORT:-52949}"
 # Railway TCP Proxy assigns a random external port but forwards to RAILWAY_PROXY_TARGET_PORT.
 # LiveKit must listen on LIVEKIT_TCP_PORT (= external port) to match its ICE candidates.
 if [ "$RAILWAY_PROXY_TARGET_PORT" != "$LIVEKIT_TCP_PORT" ]; then
-    socat TCP-LISTEN:${RAILWAY_PROXY_TARGET_PORT},fork,reuseaddr TCP:localhost:${LIVEKIT_TCP_PORT} &
+    socat -d -d TCP-LISTEN:${RAILWAY_PROXY_TARGET_PORT},fork,reuseaddr TCP:127.0.0.1:${LIVEKIT_TCP_PORT} &
     SOCAT_PID=$!
     echo "[entrypoint] socat bridge started: pid=$SOCAT_PID ports=${RAILWAY_PROXY_TARGET_PORT}->${LIVEKIT_TCP_PORT}" >&2
 else
