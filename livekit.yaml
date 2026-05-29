@@ -10,7 +10,7 @@
 # - node_ip must be the public IP of Railway's TCP Proxy edge (not the container
 #   egress IP), otherwise advertised ICE candidates point nowhere.
 
-port: ${PORT}
+port: 8080
 
 rtc:
   # Must equal the public TCP port Railway assigned for this service.
