@@ -319,27 +319,41 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(400).send({ error: { code: 'VALIDATION_ERROR', message: 'Already host' } })
       }
 
-      const meeting = await pool.query(
-        'SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1 AND ended_at IS NULL',
-        [id],
-      )
-      if (!meeting.rows[0]) {
-        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Active meeting not found' } })
-      }
-      if (meeting.rows[0].host_id !== user.sub) {
-        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the current host can transfer the role' } })
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+
+        const meeting = await client.query(
+          'SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1 AND ended_at IS NULL FOR UPDATE',
+          [id],
+        )
+        if (!meeting.rows[0]) {
+          await client.query('ROLLBACK')
+          return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Active meeting not found' } })
+        }
+        if (meeting.rows[0].host_id !== user.sub) {
+          await client.query('ROLLBACK')
+          return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the current host can transfer the role' } })
+        }
+
+        const participant = await client.query(
+          'SELECT 1 FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
+          [id, body.newHostId],
+        )
+        if (!participant.rows[0]) {
+          await client.query('ROLLBACK')
+          return reply.status(400).send({ error: { code: 'NOT_PARTICIPANT', message: 'New host must already be a participant' } })
+        }
+
+        await client.query('UPDATE meetings SET host_id = $1 WHERE id = $2', [body.newHostId, id])
+        await client.query('COMMIT')
+      } catch (err) {
+        await client.query('ROLLBACK')
+        throw err
+      } finally {
+        client.release()
       }
 
-      // New host must be a current participant of the meeting.
-      const participant = await pool.query(
-        'SELECT 1 FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
-        [id, body.newHostId],
-      )
-      if (!participant.rows[0]) {
-        return reply.status(400).send({ error: { code: 'NOT_PARTICIPANT', message: 'New host must already be a participant' } })
-      }
-
-      await pool.query('UPDATE meetings SET host_id = $1 WHERE id = $2', [body.newHostId, id])
       return reply.send({ data: { hostId: body.newHostId } })
     })
 
@@ -598,24 +612,39 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const user = request.user as { sub: string }
       const { id, userId } = request.params as { id: string; userId: string }
 
-      const meetingRes = await pool.query('SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1', [id])
-      if (!meetingRes.rows[0]) {
-        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+
+        const meetingRes = await client.query(
+          'SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1 FOR UPDATE',
+          [id]
+        )
+        if (!meetingRes.rows[0]) {
+          await client.query('ROLLBACK')
+          return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+        }
+        if (meetingRes.rows[0].host_id !== user.sub) {
+          await client.query('ROLLBACK')
+          return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the host can admit users' } })
+        }
+
+        await client.query(
+          "UPDATE meeting_waiting_room SET status = 'admitted' WHERE meeting_id = $1 AND user_id = $2",
+          [id, userId]
+        )
+        await client.query(
+          'INSERT INTO meeting_participants (meeting_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [id, userId]
+        )
+
+        await client.query('COMMIT')
+      } catch (err) {
+        await client.query('ROLLBACK')
+        throw err
+      } finally {
+        client.release()
       }
-
-      if (meetingRes.rows[0].host_id !== user.sub) {
-        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the host can admit users' } })
-      }
-
-      await pool.query(
-        "UPDATE meeting_waiting_room SET status = 'admitted' WHERE meeting_id = $1 AND user_id = $2",
-        [id, userId]
-      )
-
-      await pool.query(
-        'INSERT INTO meeting_participants (meeting_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [id, userId]
-      )
 
       return reply.send({ data: { admitted: true } })
     })
@@ -624,24 +653,39 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const user = request.user as { sub: string }
       const { id, userId } = request.params as { id: string; userId: string }
 
-      const meetingRes = await pool.query('SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1', [id])
-      if (!meetingRes.rows[0]) {
-        return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+
+        const meetingRes = await client.query(
+          'SELECT COALESCE(host_id, creator_id) AS host_id FROM meetings WHERE id = $1 FOR UPDATE',
+          [id]
+        )
+        if (!meetingRes.rows[0]) {
+          await client.query('ROLLBACK')
+          return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+        }
+        if (meetingRes.rows[0].host_id !== user.sub) {
+          await client.query('ROLLBACK')
+          return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the host can reject users' } })
+        }
+
+        await client.query(
+          "UPDATE meeting_waiting_room SET status = 'rejected' WHERE meeting_id = $1 AND user_id = $2",
+          [id, userId]
+        )
+        await client.query(
+          'DELETE FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
+          [id, userId]
+        )
+
+        await client.query('COMMIT')
+      } catch (err) {
+        await client.query('ROLLBACK')
+        throw err
+      } finally {
+        client.release()
       }
-
-      if (meetingRes.rows[0].host_id !== user.sub) {
-        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only the host can reject users' } })
-      }
-
-      await pool.query(
-        "UPDATE meeting_waiting_room SET status = 'rejected' WHERE meeting_id = $1 AND user_id = $2",
-        [id, userId]
-      )
-
-      await pool.query(
-        'DELETE FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
-        [id, userId]
-      )
 
       return reply.send({ data: { rejected: true } })
     })

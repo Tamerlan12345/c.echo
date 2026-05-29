@@ -29,20 +29,17 @@ rtc:
   # egress IP, which is different from the proxy edge IP clients connect to.
   use_external_ip: false
 
+  # Railway blocks all UDP ingress — use TCP/TLS TURN only.
+  # UDP candidates from LiveKit's own ports also won't reach clients; ICE-TCP is the primary path.
   turn_servers:
-    - host: "global.relay.metered.ca"
-      port: 80
-      protocol: "udp"
-      username: "${EXTERNAL_TURN_USERNAME}"
-      credential: "${EXTERNAL_TURN_CREDENTIAL}"
-    - host: "global.relay.metered.ca"
-      port: 443
-      protocol: "udp"
-      username: "${EXTERNAL_TURN_USERNAME}"
-      credential: "${EXTERNAL_TURN_CREDENTIAL}"
     - host: "global.relay.metered.ca"
       port: 443
       protocol: "tls"
+      username: "${EXTERNAL_TURN_USERNAME}"
+      credential: "${EXTERNAL_TURN_CREDENTIAL}"
+    - host: "global.relay.metered.ca"
+      port: 80
+      protocol: "tcp"
       username: "${EXTERNAL_TURN_USERNAME}"
       credential: "${EXTERNAL_TURN_CREDENTIAL}"
 

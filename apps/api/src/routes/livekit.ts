@@ -214,7 +214,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     } catch (err: any) {
       app.log.error({ err, meetingId }, 'Failed to start recording state')
       return reply.status(500).send({
-        error: { code: 'RECORDING_START_FAILED', message: err.message },
+        error: { code: 'RECORDING_START_FAILED', message: 'Failed to update recording state' },
       })
     }
   })
@@ -246,7 +246,7 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     } catch (err: any) {
       app.log.error({ err, meetingId }, 'Failed to stop recording state')
       return reply.status(500).send({
-        error: { code: 'RECORDING_STOP_FAILED', message: err.message },
+        error: { code: 'RECORDING_STOP_FAILED', message: 'Failed to update recording state' },
       })
     }
   })

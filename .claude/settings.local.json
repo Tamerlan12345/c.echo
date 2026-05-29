@@ -27,7 +27,13 @@
       "Bash(grep -nE \"^\\\\s{4,}.*use\\(State|Effect|Ref|Callback|Memo\\)\\\\b\" apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
       "Bash(grep -nE \"^\\\\s{4,}.*use[A-Z]\" apps/web/src/app/room/\\\\[id\\\\]/page.tsx)",
       "Bash(awk -F: '{print $1}')",
-      "Bash(nslookup nozomi.proxy.rlwy.net 8.8.8.8)"
+      "Bash(nslookup nozomi.proxy.rlwy.net 8.8.8.8)",
+      "Bash(cd /d 'd:\\\\Проекты\\\\c.echo')",
+      "Bash(powershell -Command \"Get-ChildItem -Path . -Recurse -Force | Select-Object -ExpandProperty FullName | Sort-Object\")",
+      "Bash(cd '/d/Проекты/c.echo' && find . -type f -o -type d | head -150)",
+      "Read(//d/d/Проекты/**)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js|jsx\\)$\")",
+      "Bash(xargs grep -l \"websocket\\\\|WebSocket\\\\|socket\\\\.io\\\\|ws\\\\|realtime\")"
     ]
   }
 }
