@@ -8,7 +8,7 @@
 #   ICE candidates. Set LIVEKIT_TCP_PORT and Railway TCP Proxy target port to the
 #   same value (the port Railway shows you in dashboard).
 # - node_ip must be the public IP of Railway's TCP Proxy edge (not the container
-#   egress IP), otherwise advertised ICE candidates point nowhere.
+#   egress IP). Prefer LIVEKIT_TCP_PROXY_HOST and let entrypoint resolve it.
 
 port: 8080
 
@@ -16,8 +16,8 @@ rtc:
   # Must equal the public TCP port Railway assigned for this service.
   tcp_port: ${LIVEKIT_TCP_PORT}
 
-  # Public IP that Railway TCP Proxy resolves to. Look up via:
-  #   nslookup <your-proxy-host>.proxy.rlwy.net
+  # Public IP that Railway TCP Proxy resolves to. It can be resolved at startup
+  # from LIVEKIT_TCP_PROXY_HOST, or set manually via LIVEKIT_NODE_IP.
   node_ip: "${LIVEKIT_NODE_IP}"
 
   # UDP is unreachable from outside on Railway — keep range minimal.
