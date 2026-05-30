@@ -5,23 +5,13 @@ import { randomUUID } from 'crypto'
 import { RoomServiceClient } from 'livekit-server-sdk'
 import { pool, runWithUser } from '../db/pool.js'
 import { runThrottledCleanup, MAX_ACTIVE_MEETINGS } from '../services/limits.js'
-
-const getLiveKitUrl = (): string => {
-  const url = process.env.LIVEKIT_URL || ''
-  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
-    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
-  }
-  return url
-}
+import { getLiveKitApiUrl, getLiveKitCredentials } from '../services/livekit-config.js'
 
 let lkClient: RoomServiceClient | null = null
 const getLkClient = () => {
   if (!lkClient) {
-    lkClient = new RoomServiceClient(
-      getLiveKitUrl(),
-      process.env.LIVEKIT_API_KEY!,
-      process.env.LIVEKIT_API_SECRET!,
-    )
+    const { apiKey, apiSecret } = getLiveKitCredentials()
+    lkClient = new RoomServiceClient(getLiveKitApiUrl(), apiKey, apiSecret)
   }
   return lkClient
 }
@@ -253,12 +243,15 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       const { id } = request.params as { id: string }
 
       const meetingResult = await pool.query(
-        'SELECT id, creator_id, COALESCE(host_id, creator_id) AS host_id, is_public AS "isPublic", waiting_room_enabled AS "waitingRoomEnabled" FROM meetings WHERE id = $1',
+        'SELECT id, creator_id, COALESCE(host_id, creator_id) AS host_id, ended_at, is_public AS "isPublic", waiting_room_enabled AS "waitingRoomEnabled" FROM meetings WHERE id = $1',
         [id]
       )
       const meeting = meetingResult.rows[0]
       if (!meeting) {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Meeting not found' } })
+      }
+      if (meeting.ended_at) {
+        return reply.status(400).send({ error: { code: 'MEETING_ENDED', message: 'Meeting has ended' } })
       }
 
       const isGuest = user.email?.endsWith('@guest.centras-echo.local') ?? false
@@ -368,12 +361,15 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const meeting = await pool.query(
-        'SELECT creator_id, created_at FROM meetings WHERE id = $1 AND ended_at IS NULL',
+        'SELECT COALESCE(host_id, creator_id) AS host_id, created_at FROM meetings WHERE id = $1 AND ended_at IS NULL',
         [id],
       )
 
       if (!meeting.rows[0]) {
         return reply.status(404).send({ error: { code: 'NOT_FOUND', message: 'Active meeting not found' } })
+      }
+      if (meeting.rows[0].host_id !== user.sub) {
+        return reply.status(403).send({ error: { code: 'FORBIDDEN', message: 'Only host can end meeting' } })
       }
 
       const durationSec = Math.floor((Date.now() - new Date(meeting.rows[0].created_at).getTime()) / 1000)

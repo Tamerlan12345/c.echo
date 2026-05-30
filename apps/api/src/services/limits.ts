@@ -2,18 +2,11 @@ import type { FastifyPluginAsync } from 'fastify'
 import { RoomServiceClient } from 'livekit-server-sdk'
 import { pool } from '../db/pool.js'
 import type { User } from '@centras/shared'
+import { getLiveKitApiUrl, getLiveKitCredentials } from './livekit-config.js'
 
 // Constants enforced at API level
 export const MAX_PARTICIPANTS_PER_MEETING = 7
 export const MAX_ACTIVE_MEETINGS = 5
-
-const getLiveKitUrl = (): string => {
-  const url = process.env.LIVEKIT_URL || ''
-  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
-    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
-  }
-  return url
-}
 
 let lastCleanupTime = 0
 
@@ -108,11 +101,8 @@ export async function getParticipantCount(meetingId: string): Promise<number> {
 
   // 2. Count active participants in LiveKit
   try {
-    const client = new RoomServiceClient(
-      getLiveKitUrl(),
-      process.env.LIVEKIT_API_KEY!,
-      process.env.LIVEKIT_API_SECRET!,
-    )
+    const { apiKey, apiSecret } = getLiveKitCredentials()
+    const client = new RoomServiceClient(getLiveKitApiUrl(), apiKey, apiSecret)
     const participants = await client.listParticipants(meeting.livekit_room)
     return participants.length
   } catch (err) {

@@ -1,58 +1,12 @@
 import type { FastifyPluginAsync } from 'fastify'
-import { AccessToken, RoomServiceClient, EgressClient } from 'livekit-server-sdk'
-import type { EncodedFileOutput } from 'livekit-server-sdk'
-import fs from 'fs'
-import path from 'path'
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk'
 import { pool } from '../db/pool.js'
-import { getActiveCount, getParticipantCount, MAX_PARTICIPANTS_PER_MEETING, MAX_ACTIVE_MEETINGS } from '../services/limits.js'
+import { getParticipantCount, MAX_PARTICIPANTS_PER_MEETING } from '../services/limits.js'
+import { getLiveKitApiUrl, getLiveKitCredentials, getPublicLiveKitUrl } from '../services/livekit-config.js'
 
-const getLiveKitUrl = (): string => {
-  const url = process.env.LIVEKIT_URL || ''
-  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
-    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
-  }
-  return url
-}
-
-const getLiveKitClient = () => new RoomServiceClient(
-  getLiveKitUrl(),
-  process.env.LIVEKIT_API_KEY!,
-  process.env.LIVEKIT_API_SECRET!,
-)
-
-const getEgressClient = () => new EgressClient(
-  getLiveKitUrl(),
-  process.env.LIVEKIT_API_KEY!,
-  process.env.LIVEKIT_API_SECRET!,
-)
-
-const getPublicLiveKitUrl = (): string => {
-  if (process.env.PUBLIC_LIVEKIT_URL) {
-    return process.env.PUBLIC_LIVEKIT_URL
-  }
-
-  const livekitUrl = process.env.LIVEKIT_URL || ''
-  if (
-    livekitUrl &&
-    !livekitUrl.includes('localhost') &&
-    !livekitUrl.includes('127.0.0.1') &&
-    !livekitUrl.includes('.internal') &&
-    (livekitUrl.startsWith('wss://') || livekitUrl.startsWith('ws://'))
-  ) {
-    return livekitUrl
-  }
-
-  const frontendUrl = process.env.FRONTEND_URL || ''
-  if (frontendUrl && !frontendUrl.includes('localhost') && !frontendUrl.includes('127.0.0.1')) {
-    try {
-      const url = new URL(frontendUrl)
-      return `wss://livekit.${url.hostname}`
-    } catch {
-      // ignore
-    }
-  }
-
-  return livekitUrl || 'ws://localhost:7880'
+const getLiveKitClient = () => {
+  const { apiKey, apiSecret } = getLiveKitCredentials()
+  return new RoomServiceClient(getLiveKitApiUrl(), apiKey, apiSecret)
 }
 
 export const livekitRoutes: FastifyPluginAsync = async (app) => {
@@ -112,15 +66,12 @@ export const livekitRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Build LiveKit access token
-    const at = new AccessToken(
-      process.env.LIVEKIT_API_KEY!,
-      process.env.LIVEKIT_API_SECRET!,
-      {
-        identity: user.sub,
-        name: user.name,
-        ttl: '2h',
-      },
-    )
+    const { apiKey, apiSecret } = getLiveKitCredentials()
+    const at = new AccessToken(apiKey, apiSecret, {
+      identity: user.sub,
+      name: user.name,
+      ttl: '2h',
+    })
 
     at.addGrant({
       room: meeting.livekit_room,

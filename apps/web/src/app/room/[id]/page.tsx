@@ -1414,32 +1414,33 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       try {
         const decoder = new TextDecoder()
         const data = JSON.parse(decoder.decode(payload))
+        const isHostMessage = participant?.identity === currentHostId
         if (data.type === 'consent_updated') {
           pollConsent()
         } else if (data.type === 'request_consent') {
-          if (!isHost) {
+          if (isHostMessage && !isHost) {
             setShowConsentModal(true)
           }
         } else if (data.type === 'mute_participant') {
-          if (data.targetIdentity === localParticipant?.identity) {
+          if (isHostMessage && data.targetIdentity === localParticipant?.identity) {
             localParticipant.setMicrophoneEnabled(false)
             setMicEnabled(false)
           }
         } else if (data.type === 'mute_all') {
           // Host requested everyone to mute. Host's own mic is unaffected (they send, not receive their own data).
-          if (localParticipant && participant?.identity !== localParticipant.identity) {
+          if (isHostMessage && localParticipant && participant?.identity !== localParticipant.identity) {
             localParticipant.setMicrophoneEnabled(false)
             setMicEnabled(false)
           }
         } else if (data.type === 'host_changed') {
           // Host transfer broadcast — sync local host state for all clients.
-          if (typeof data.newHostId === 'string') {
+          if (isHostMessage && typeof data.newHostId === 'string') {
             setCurrentHostId(data.newHostId)
           }
         } else if (data.type === 'recording_started') {
-          setIsRecording(true)
+          if (isHostMessage) setIsRecording(true)
         } else if (data.type === 'recording_stopped') {
-          setIsRecording(false)
+          if (isHostMessage) setIsRecording(false)
         } else if (data.type === 'raise_hand') {
           setRaisedHands((prev) => ({ ...prev, [participant.identity]: data.raised }))
         } else if (data.type === 'reaction') {
@@ -1518,7 +1519,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       room.off(RoomEvent.DataReceived, handleDataReceived)
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
     }
-  }, [room, isHost, pollConsent, showChat, localParticipant, translateTargetLang])
+  }, [room, isHost, pollConsent, showChat, localParticipant, currentHostId, translateTargetLang])
 
   // ─── Senti Translate (BETA) Audio Recognition & Simulation ───
   const recognitionRef = useRef<any>(null)

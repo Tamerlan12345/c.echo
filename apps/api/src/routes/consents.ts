@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { RoomServiceClient } from 'livekit-server-sdk'
 import { pool } from '../db/pool.js'
+import { getLiveKitApiUrl, getLiveKitCredentials } from '../services/livekit-config.js'
 
 export const consentsRoutes: FastifyPluginAsync = async (app) => {
 
@@ -67,14 +68,6 @@ export const consentsRoutes: FastifyPluginAsync = async (app) => {
   })
 }
 
-const getLiveKitUrl = (): string => {
-  const url = process.env.LIVEKIT_URL || ''
-  if (url.includes('.internal') && process.env.PUBLIC_LIVEKIT_URL) {
-    return process.env.PUBLIC_LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://')
-  }
-  return url
-}
-
 async function getConsentStatus(meetingId: string) {
   let activeUserIds: string[] | null = null
   try {
@@ -84,11 +77,8 @@ async function getConsentStatus(meetingId: string) {
     )
     const meeting = meetingRes.rows[0]
     if (meeting) {
-      const client = new RoomServiceClient(
-        getLiveKitUrl(),
-        process.env.LIVEKIT_API_KEY!,
-        process.env.LIVEKIT_API_SECRET!,
-      )
+      const { apiKey, apiSecret } = getLiveKitCredentials()
+      const client = new RoomServiceClient(getLiveKitApiUrl(), apiKey, apiSecret)
       const participants = await client.listParticipants(meeting.livekit_room)
       activeUserIds = participants.map((p) => p.identity)
     }
