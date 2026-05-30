@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   LiveKitRoom,
@@ -26,6 +26,20 @@ import { livekitApi, meetingsApi, consentApi, authApi } from '@/lib/api'
 import type { Meeting, User, ConsentStatus } from '@centras/shared'
 import styles from './room.module.css'
 import { Logo, LogoIcon } from '@/components/Logo'
+
+type TrackRefLike = ReturnType<typeof useTracks>[number]
+
+function removeReplacedPlaceholders(tracks: TrackRefLike[]) {
+  const publishedKeys = new Set(
+    tracks
+      .filter((track) => track.publication)
+      .map((track) => `${track.participant.identity}:${track.source}`),
+  )
+
+  return tracks.filter((track) => (
+    track.publication || !publishedKeys.has(`${track.participant.identity}:${track.source}`)
+  ))
+}
 
 // ─── Connection Quality Indicator Component ───────────────────────────────────
 
@@ -1190,6 +1204,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
     ],
     { onlySubscribed: false },
   )
+  const visibleTracks = useMemo(() => removeReplacedPlaceholders(tracks), [tracks])
 
   // UI state
   const [showSenti, setShowSenti] = useState(false)
@@ -2368,13 +2383,13 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
         {/* LiveKit video grid */}
         <div className={styles.videoGrid}>
           {viewMode === 'gallery' ? (
-            <GridLayout tracks={tracks} style={{ height: '100%' }}>
+            <GridLayout tracks={visibleTracks} style={{ height: '100%' }}>
               <ParticipantTile>
                 <ParticipantHandOverlay raisedHands={raisedHands} />
               </ParticipantTile>
             </GridLayout>
           ) : (
-            <SpeakerView tracks={tracks} raisedHands={raisedHands} />
+            <SpeakerView tracks={visibleTracks} raisedHands={raisedHands} />
           )}
 
           {/* Floating Consent Banner inside video area */}
