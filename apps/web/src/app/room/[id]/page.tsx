@@ -27,6 +27,9 @@ import styles from './room.module.css'
 import { Logo, LogoIcon } from '@/components/Logo'
 
 type TrackRefLike = ReturnType<typeof useTracks>[number]
+const forceLiveKitRelay =
+  process.env.NEXT_PUBLIC_LIVEKIT_FORCE_RELAY === 'true' ||
+  (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_LIVEKIT_FORCE_RELAY !== 'false')
 
 function removeReplacedPlaceholders(tracks: TrackRefLike[]) {
   const publishedKeys = new Set(
@@ -121,6 +124,13 @@ export default function RoomPage() {
   // Involuntary disconnect & recovery
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const isLeavingRef = useRef(false)
+  const livekitConnectOptions = useMemo(() => ({
+    autoSubscribe: true,
+    peerConnectionTimeout: 45000,
+    ...(forceLiveKitRelay
+      ? { rtcConfig: { iceTransportPolicy: 'relay' as RTCIceTransportPolicy } }
+      : {}),
+  }), [])
 
   // System-level check of camera/mic presence on mount
   useEffect(() => {
@@ -624,10 +634,7 @@ export default function RoomPage() {
       connect={true}
       video={hasCamera && initialCamEnabled ? (selectedCamId ? { deviceId: selectedCamId } : true) : false}
       audio={hasMicrophone && initialMicEnabled ? (selectedMicId ? { deviceId: selectedMicId } : true) : false}
-      connectOptions={{
-        autoSubscribe: true,
-        peerConnectionTimeout: 45000,
-      }}
+      connectOptions={livekitConnectOptions}
       onDisconnected={() => {
         if (isLeavingRef.current) {
           const isGuest = user?.email.endsWith('@guest.centras-echo.local')
