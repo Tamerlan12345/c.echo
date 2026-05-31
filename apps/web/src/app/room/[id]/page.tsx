@@ -8,7 +8,6 @@ import {
   useLocalParticipant,
   useRoomContext,
   RoomAudioRenderer,
-  GridLayout,
   ParticipantTile,
   useTracks,
   useParticipantContext,
@@ -678,6 +677,22 @@ function ParticipantHandOverlay({ raisedHands }: { raisedHands: Record<string, b
 }
 
 // ─── Speaker view (one big tile + thumbnail strip) ────────────────────────────
+
+function GalleryView({ tracks, raisedHands }: { tracks: TrackRefLike[]; raisedHands: Record<string, boolean> }) {
+  return (
+    <div className={styles.galleryGrid}>
+      {tracks.map((trackRef) => (
+        <ParticipantTile
+          key={`${trackRef.participant.identity}:${trackRef.source}:${trackRef.publication?.trackSid ?? 'placeholder'}`}
+          trackRef={trackRef}
+          style={{ width: '100%', height: '100%' }}
+        >
+          <ParticipantHandOverlay raisedHands={raisedHands} />
+        </ParticipantTile>
+      ))}
+    </div>
+  )
+}
 
 function SpeakerView({ tracks, raisedHands }: { tracks: ReturnType<typeof useTracks>; raisedHands: Record<string, boolean> }) {
   // Pick the focus track: prefer a ScreenShare, otherwise the active speaker, otherwise the first remote camera, otherwise any.
@@ -2383,11 +2398,7 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
         {/* LiveKit video grid */}
         <div className={styles.videoGrid}>
           {viewMode === 'gallery' ? (
-            <GridLayout tracks={visibleTracks} style={{ height: '100%' }}>
-              <ParticipantTile>
-                <ParticipantHandOverlay raisedHands={raisedHands} />
-              </ParticipantTile>
-            </GridLayout>
+            <GalleryView tracks={visibleTracks} raisedHands={raisedHands} />
           ) : (
             <SpeakerView tracks={visibleTracks} raisedHands={raisedHands} />
           )}
