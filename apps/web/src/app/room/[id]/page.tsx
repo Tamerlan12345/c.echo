@@ -27,9 +27,7 @@ import styles from './room.module.css'
 import { Logo, LogoIcon } from '@/components/Logo'
 
 type TrackRefLike = ReturnType<typeof useTracks>[number]
-const forceLiveKitRelay =
-  process.env.NEXT_PUBLIC_LIVEKIT_FORCE_RELAY === 'true' ||
-  (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_LIVEKIT_FORCE_RELAY !== 'false')
+const forceLiveKitRelay = process.env.NEXT_PUBLIC_LIVEKIT_FORCE_RELAY === 'true'
 
 function removeReplacedPlaceholders(tracks: TrackRefLike[]) {
   const publishedKeys = new Set(
