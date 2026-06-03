@@ -361,7 +361,7 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const meeting = await pool.query(
-        'SELECT COALESCE(host_id, creator_id) AS host_id, created_at FROM meetings WHERE id = $1 AND ended_at IS NULL',
+        'SELECT COALESCE(host_id, creator_id) AS host_id, created_at, livekit_room FROM meetings WHERE id = $1 AND ended_at IS NULL',
         [id],
       )
 
@@ -378,6 +378,13 @@ export const meetingsRoutes: FastifyPluginAsync = async (app) => {
         'UPDATE meetings SET ended_at = NOW(), duration_sec = $1 WHERE id = $2',
         [durationSec, id],
       )
+
+      // Forcefully disconnect all participants from LiveKit
+      try {
+        await getLkClient().deleteRoom(meeting.rows[0].livekit_room)
+      } catch (err) {
+        request.log.warn({ err, livekit_room: meeting.rows[0].livekit_room }, 'Failed to delete LiveKit room on end')
+      }
 
       // Run guest and inactive room cleanup in the background
       runThrottledCleanup()

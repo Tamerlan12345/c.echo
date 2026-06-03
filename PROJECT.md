@@ -67,9 +67,9 @@
 | 23 | Настройка сборки self-hosted LiveKit из репозитория | [x] | [livekit.yaml](file:///f:/c.echo/livekit.yaml), [Dockerfile.livekit](file:///f:/c.echo/Dockerfile.livekit), [entrypoint.sh](file:///f:/c.echo/entrypoint.sh) | Создан Dockerfile.livekit, entrypoint.sh и скорректирован livekit.yaml для деплоя сервера LiveKit напрямую из GitHub-репозитория. Настроена подстановка переменных TURN, Keys и Redis при запуске через `envsubst` для предотвращения ошибок разбора YAML. |
 | 24 | Синхронизация TCP-портов для стабильности WebRTC ICE-TCP | [x] | [PROJECT.md](file:///f:/c.echo/PROJECT.md), [livekit.yaml](file:///f:/c.echo/livekit.yaml) | Документировано решение по сопоставлению портов TCP Proxy (23787 -> :23787) и переменной LIVEKIT_TCP_PORT для устранения сброса PeerConnection на клиентах за брандмауэром. |
 | 25 | Устранение обрыва соединения (reason 14) и сбоев PeerConnection | [x] | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx) | Исправлено состояние гонки (race condition) при двойном монтировании React 18 Strict Mode, приводившее к генерации дублирующих LiveKit токенов и каскадному сбросу сессий сервером. |
-
-
-
+| 26 | Исследование бесплатного хостинга в LiveKit Cloud | [x] | [livekit_hosting_research.md](file:///C:/Users/TJumagulov/.gemini/antigravity/brain/81d0ec0a-84f2-485a-918f-a13c2179b392/artifacts/livekit_hosting_research.md) | Проведено исследование тарифов и квот LiveKit Cloud (Build plan), лимитов на минуты/трафик и сравнение с self-hosted конфигурацией. |
+| 27 | Инструкция по подключению LiveKit Cloud | [x] | [PROJECT.md](file:///f:/c.echo/PROJECT.md) | Создано пошаговое руководство по интеграции ключей LiveKit Cloud (Build Plan) в файлы переменных окружения `.env` для Centras.Echo. |
+| 28 | Исправление выкидывания гостей на дашборд и принудительное отключение | [x] | [page.tsx](file:///f:/c.echo/apps/web/src/app/room/[id]/page.tsx), [meetings.ts](file:///f:/c.echo/apps/api/src/routes/meetings.ts) | Убран хардкод `router.push('/dashboard')` при выходе, делегирована проверка гостя в `onDisconnected`. Настроено активное удаление комнаты (deleteRoom) на LiveKit Server при End Call, что выкидывает всех неавторизованных пользователей мгновенно с правильным показом экрана "Конференция завершена". |
 
 ---
 

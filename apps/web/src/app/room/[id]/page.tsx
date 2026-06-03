@@ -634,7 +634,7 @@ export default function RoomPage() {
       audio={hasMicrophone && initialMicEnabled ? (selectedMicId ? { deviceId: selectedMicId } : true) : false}
       connectOptions={livekitConnectOptions}
       onDisconnected={() => {
-        if (isLeavingRef.current) {
+        const handleLeave = () => {
           const isGuest = user?.email.endsWith('@guest.centras-echo.local')
           if (isGuest) {
             setIsEnded(true)
@@ -644,11 +644,23 @@ export default function RoomPage() {
           } else {
             router.push('/dashboard')
           }
+        }
+
+        if (isLeavingRef.current) {
+          handleLeave()
           return
         }
 
-        // Involuntary disconnect — show the premium recovery screen
-        setConnectionError('Соединение с сервером видеоконференций Centras Echo потеряно. Проверьте стабильность интернет-соединения и настройки корпоративного брандмауэра.')
+        // Involuntary disconnect — check if meeting ended or show error
+        meetingsApi.get(id).then((res) => {
+          if ('data' in res && res.data && res.data.endedAt) {
+            handleLeave()
+          } else {
+            setConnectionError('Соединение с сервером видеоконференций Centras Echo потеряно. Проверьте стабильность интернет-соединения и настройки корпоративного брандмауэра.')
+          }
+        }).catch(() => {
+          setConnectionError('Соединение с сервером видеоконференций Centras Echo потеряно. Проверьте стабильность интернет-соединения и настройки корпоративного брандмауэра.')
+        })
       }}
       style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}
     >
@@ -2209,7 +2221,6 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
       await stopAndUploadRecording()
     }
     room.disconnect()
-    router.push('/dashboard')
   }
 
   // End call
@@ -2221,7 +2232,6 @@ function RoomInner({ meeting, user, meetingId, router, onLeave, selectedMicId }:
     }
     await meetingsApi.end(meetingId)
     room.disconnect()
-    router.push('/dashboard')
   }
 
   const formatTimer = (s: number) => {
