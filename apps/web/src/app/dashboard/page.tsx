@@ -9,7 +9,7 @@ import { Logo, LogoIcon } from '@/components/Logo'
 import {
   Video, Plus, Archive, Settings, LogOut, Users,
   Clock, Shield, ChevronRight, Zap,
-  Calendar, Copy, Check, CalendarClock, Globe, Loader2
+  Calendar, Copy, Check, CalendarClock, Globe
 } from 'lucide-react'
 
 const MAX_ACTIVE = 5
@@ -94,11 +94,11 @@ export default function DashboardPage() {
     const creatorName = (meeting as any).creator?.name ?? user?.name ?? 'Организатор'
     const dateStr = meeting.scheduledStart
       ? new Intl.DateTimeFormat('ru-RU', {
-          day: 'numeric',
-          month: 'long',
-          hour: '2-digit',
-          minute: '2-digit',
-        }).format(new Date(meeting.scheduledStart))
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(meeting.scheduledStart))
       : null
 
     const lines = [
@@ -307,7 +307,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className={styles.scheduledActions}>
                       <button
                         className="btn btn-ghost btn-sm"
@@ -363,15 +363,10 @@ export default function DashboardPage() {
       {/* Create meeting modal */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
-            <div style={{ marginBottom: 'var(--space-6)' }}>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>Новая встреча</h3>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9375rem', marginTop: '4px' }}>
-                Настройте параметры вашей видеоконференции.
-              </p>
-            </div>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <h3 style={{ marginBottom: 'var(--space-4)' }}>Новая встреча</h3>
             <form onSubmit={handleCreate}>
-              <div style={{ marginBottom: 'var(--space-6)' }}>
+              <div style={{ marginBottom: 'var(--space-4)' }}>
                 <label className={styles.label} htmlFor="meeting-title">
                   Название встречи
                 </label>
@@ -442,7 +437,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Waiting Room toggle */}
-              <div className={styles.modalOption} style={{ marginBottom: 'var(--space-8)' }}>
+              <div className={styles.modalOption} style={{ marginBottom: 'var(--space-6)' }}>
                 <input
                   id="waiting-room-toggle"
                   type="checkbox"
@@ -454,7 +449,7 @@ export default function DashboardPage() {
                 </label>
               </div>
 
-              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-5)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowCreate(false)}>
                   Отмена
                 </button>
@@ -463,9 +458,8 @@ export default function DashboardPage() {
                   type="submit"
                   className="btn btn-primary"
                   disabled={!newTitle.trim() || creating}
-                  style={{ minWidth: 140 }}
                 >
-                  {creating ? <><Loader2 size={16} className="spin" /> Создание...</> : isScheduled ? 'Запланировать' : 'Создать и войти'}
+                  {creating ? 'Создание...' : isScheduled ? 'Запланировать' : 'Создать и войти'}
                 </button>
               </div>
             </form>
@@ -511,7 +505,7 @@ function MeetingCard({ meeting, isActive, onJoin, formatDate, onCopyInvite, copi
       <p className={styles.meetingMeta}>
         <Clock size={12} /> {meeting.scheduledStart ? `Начало: ${formatDate(meeting.scheduledStart)}` : formatDate(meeting.createdAt)}
       </p>
-      
+
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'auto', width: '100%' }}>
         <button
           className="btn btn-ghost btn-sm"
@@ -591,8 +585,8 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 function DashboardSkeleton() {
   return (
     <div style={{ padding: 'var(--space-8)' }}>
-      {[1,2,3].map((i) => (
-        <div key={i} className="skeleton" style={{ height: 120, marginBottom: 24, borderRadius: 'var(--radius-xl)' }} />
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="skeleton" style={{ height: 80, marginBottom: 16, borderRadius: 'var(--radius-lg)' }} />
       ))}
     </div>
   )
