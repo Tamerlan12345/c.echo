@@ -3,7 +3,7 @@
 .roomLayout {
   display: flex;
   height: 100dvh;
-  background: #07090F;
+  background: var(--color-bg-primary);
   overflow: hidden;
   position: relative;
 }
@@ -139,7 +139,7 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  background: #06080F;
+  background: var(--color-bg-primary);
 }
 
 .videoHeader {
@@ -195,7 +195,7 @@
   flex: 1;
   overflow: hidden;
   position: relative;
-  background: #06080F;
+  background: var(--color-bg-primary);
 }
 
 .galleryGrid {
@@ -214,7 +214,7 @@
 
 /* LiveKit override styles */
 .videoGrid :global([data-lk-theme]) {
-  --lk-bg: #06080F;
+  --lk-bg: var(--color-bg-primary);
   --lk-bg2: #0D1120;
   --lk-border-color: rgba(255, 255, 255, 0.06);
   height: 100%;

@@ -9,7 +9,7 @@ import { Logo, LogoIcon } from '@/components/Logo'
 import {
   Video, Plus, Archive, Settings, LogOut, Users,
   Clock, Shield, ChevronRight, Zap,
-  Calendar, Copy, Check, CalendarClock, Globe
+  Calendar, Copy, Check, CalendarClock, Globe, Loader2
 } from 'lucide-react'
 
 const MAX_ACTIVE = 5
@@ -363,10 +363,15 @@ export default function DashboardPage() {
       {/* Create meeting modal */}
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
-            <h3 style={{ marginBottom: 'var(--space-4)' }}>Новая встреча</h3>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <div style={{ marginBottom: 'var(--space-6)' }}>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>Новая встреча</h3>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9375rem', marginTop: '4px' }}>
+                Настройте параметры вашей видеоконференции.
+              </p>
+            </div>
             <form onSubmit={handleCreate}>
-              <div style={{ marginBottom: 'var(--space-4)' }}>
+              <div style={{ marginBottom: 'var(--space-6)' }}>
                 <label className={styles.label} htmlFor="meeting-title">
                   Название встречи
                 </label>
@@ -437,7 +442,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Waiting Room toggle */}
-              <div className={styles.modalOption} style={{ marginBottom: 'var(--space-6)' }}>
+              <div className={styles.modalOption} style={{ marginBottom: 'var(--space-8)' }}>
                 <input
                   id="waiting-room-toggle"
                   type="checkbox"
@@ -449,7 +454,7 @@ export default function DashboardPage() {
                 </label>
               </div>
 
-              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-5)' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowCreate(false)}>
                   Отмена
                 </button>
@@ -458,8 +463,9 @@ export default function DashboardPage() {
                   type="submit"
                   className="btn btn-primary"
                   disabled={!newTitle.trim() || creating}
+                  style={{ minWidth: 140 }}
                 >
-                  {creating ? 'Создание...' : isScheduled ? 'Запланировать' : 'Создать и войти'}
+                  {creating ? <><Loader2 size={16} className="spin" /> Создание...</> : isScheduled ? 'Запланировать' : 'Создать и войти'}
                 </button>
               </div>
             </form>
@@ -586,7 +592,7 @@ function DashboardSkeleton() {
   return (
     <div style={{ padding: 'var(--space-8)' }}>
       {[1,2,3].map((i) => (
-        <div key={i} className="skeleton" style={{ height: 80, marginBottom: 16, borderRadius: 'var(--radius-lg)' }} />
+        <div key={i} className="skeleton" style={{ height: 120, marginBottom: 24, borderRadius: 'var(--radius-xl)' }} />
       ))}
     </div>
   )
